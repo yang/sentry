@@ -122,7 +122,7 @@ def expose_url(url):
 
 
 def get_domain_key(url):
-    domain = urlparse(url).netloc
+    domain = urlparse(url).netloc  # a.k.a. hostname
     return f"source:blacklist:v2:{md5_text(domain).hexdigest()}"
 
 

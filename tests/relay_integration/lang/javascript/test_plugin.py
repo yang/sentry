@@ -983,7 +983,7 @@ class JavascriptIntegrationTest(RelayStoreHelper, SnubaTestCase, TransactionTest
         event = self.post_and_retrieve_event(data)
 
         assert event.data["errors"] == [
-            {"url": "http://example.com/unsupported.sourcemap.js", "type": "js_invalid_source"}
+            {"url": "http://example.com/unsupported.sourcemap.js", "type": "js_invalid_sourcemap"}
         ]
 
     def test_failed_sourcemap_expansion_data_url(self):

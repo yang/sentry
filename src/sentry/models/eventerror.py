@@ -23,17 +23,24 @@ class EventError:
     TOO_LARGE_FOR_CACHE = "too_large_for_cache"
 
     # Processing: JavaScript
-    JS_GENERIC_FETCH_ERROR = "js_generic_fetch_error"  # deprecated in favor of FETCH_GENERIC_ERROR
-    JS_INVALID_HTTP_CODE = "js_invalid_http_code"  # deprecated in favor of FETCH_INVALID_HTTP_CODE
+    JS_GENERIC_FETCH_ERROR = "js_generic_fetch_error"
+    JS_TRUNCATED_URL = "js_truncated_url"
+    JS_INVALID_URL = "js_invalid_url"
+    JS_INVALID_HTTP_CODE = "js_invalid_http_code"
     JS_INVALID_CONTENT = "js_invalid_content"
-    JS_NO_COLUMN = "js_no_column"
-    JS_MISSING_SOURCE = "js_no_source"
-    JS_INVALID_SOURCEMAP = "js_invalid_source"
+    JS_NO_COLUMN = "js_no_column"  # deprecated in favor of JS_MISSING_ROW_OR_COLUMN
+    JS_MISSING_ROW_OR_COLUMN = "js_missing_row_or_column"
+    JS_MISSING_SOURCE = "js_no_source"  # TODO (kmclb) include things which used to be this in places where we check for this
+    JS_INVALID_SOURCEMAP = "js_invalid_sourcemap"  # TODO (kmclb) look for UnparseableSourcemap
     JS_TOO_MANY_REMOTE_SOURCES = "js_too_many_sources"
     JS_INVALID_SOURCE_ENCODING = "js_invalid_source_encoding"
-    JS_INVALID_SOURCEMAP_LOCATION = "js_invalid_sourcemap_location"
-    JS_TOO_LARGE = "js_too_large"  # deprecated in favor of FETCH_TOO_LARGE
-    JS_FETCH_TIMEOUT = "js_fetch_timeout"  # deprecated in favor of FETCH_TIMEOUT
+    JS_INVALID_SOURCEMAP_LOCATION = (
+        "js_invalid_sourcemap_location"  # deprecated in favor of JS_INVALID_STACKFRAME_LOCATION
+    )
+    JS_INVALID_STACKFRAME_LOCATION = "js_invalid_stackframe_location"
+    JS_TOO_LARGE = "js_too_large"
+    JS_FETCH_TIMEOUT = "js_fetch_timeout"
+    JS_SCRAPING_DISABLED = "js_scraping_disabled"
 
     # Processing: Native
     NATIVE_NO_CRASHED_THREAD = "native_no_crashed_thread"
@@ -64,22 +71,27 @@ class EventError:
         SECURITY_VIOLATION: "Cannot fetch resource due to security violation",
         RESTRICTED_IP: "Cannot fetch resource due to restricted IP address",
         FETCH_GENERIC_ERROR: "Unable to fetch HTTP resource",
-        FETCH_INVALID_HTTP_CODE: "HTTP returned error response",
+        FETCH_INVALID_HTTP_CODE: "HTTP request returned error response",
         FETCH_INVALID_ENCODING: "Source file was not encoded properly",
         FETCH_TOO_LARGE: "Remote file too large for downloading",
         FETCH_TIMEOUT: "Remote file took too long to load",
         TOO_LARGE_FOR_CACHE: "Remote file too large for caching",
         JS_GENERIC_FETCH_ERROR: "Unable to fetch resource",
-        JS_INVALID_HTTP_CODE: "HTTP returned error response",
+        JS_TRUNCATED_URL: "Filename is truncated",
+        JS_INVALID_URL: "URL is invalid",
+        JS_INVALID_HTTP_CODE: "HTTP request returned error response",
         JS_INVALID_CONTENT: "Source file was not JavaScript",
-        JS_NO_COLUMN: "Cannot expand sourcemap due to missing column information",
+        JS_NO_COLUMN: "Cannot apply sourcemap because stacktrace frame is missing column information",
+        JS_MISSING_ROW_OR_COLUMN: "Cannot apply sourcemap because frame is missing row or column information",
         JS_MISSING_SOURCE: "Source code was not found",
         JS_INVALID_SOURCEMAP: "Sourcemap was invalid or not parseable",
         JS_TOO_MANY_REMOTE_SOURCES: "The maximum number of remote source requests was made",
-        JS_INVALID_SOURCE_ENCODING: "Source file was not encoded properly",
-        JS_INVALID_SOURCEMAP_LOCATION: "Invalid location in sourcemap",
-        JS_TOO_LARGE: "Remote file too large",
+        JS_INVALID_SOURCE_ENCODING: "File was not encoded properly",
+        JS_INVALID_SOURCEMAP_LOCATION: "Invalid stackframe location",
+        JS_INVALID_STACKFRAME_LOCATION: "Invalid stackframe location",
+        JS_TOO_LARGE: "Remote file too large for caching",
         JS_FETCH_TIMEOUT: "Remote file took too long to load",
+        JS_SCRAPING_DISABLED: "Web scraping is disabled",
         NATIVE_NO_CRASHED_THREAD: "No crashed thread found in crash report",
         NATIVE_INTERNAL_FAILURE: "Internal failure when attempting to symbolicate",
         NATIVE_BAD_DSYM: "The debug information file used was broken.",
@@ -92,6 +104,12 @@ class EventError:
         NATIVE_SYMBOLICATOR_FAILED: "Failed to process native stacktraces.",
         PROGUARD_MISSING_MAPPING: "A proguard mapping file was missing.",
         PROGUARD_MISSING_LINENO: "A proguard mapping file does not contain line info.",
+    }
+
+    _phases = {
+        "fetch_file.precheck": "Matched file search: Precheck",
+        "fetch_file.web_scraping": "Matched file search: Web scraping",
+        "process_file.pre_check": "File processing: Precheck",
     }
 
     @classmethod

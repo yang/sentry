@@ -72,7 +72,7 @@ export default function getGuidesContent(orgSlug: string | null): GuidesContent 
           title: t('Narrow Down Suspects'),
           target: 'exception',
           description: t(
-            `We've got stack trace. See the exact sequence of function calls leading to the error
+            `We've got stack traces. See the exact sequence of function calls leading to the error
                 in question, no detective skills necessary.`
           ),
         },
