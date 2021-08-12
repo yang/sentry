@@ -31,6 +31,7 @@ class EventError:
     JS_NO_COLUMN = "js_no_column"  # deprecated in favor of JS_MISSING_ROW_OR_COLUMN
     JS_MISSING_ROW_OR_COLUMN = "js_missing_row_or_column"
     JS_MISSING_SOURCE = "js_no_source"  # TODO (kmclb) include things which used to be this in places where we check for this
+    JS_MISSING_ORIGINAL_CODE = "js_no_original code"  # TODO (kmclb) Can we just use missing source?
     JS_INVALID_SOURCEMAP = "js_invalid_sourcemap"  # TODO (kmclb) look for UnparseableSourcemap
     JS_TOO_MANY_REMOTE_SOURCES = "js_too_many_sources"
     JS_INVALID_SOURCE_ENCODING = "js_invalid_source_encoding"
@@ -84,6 +85,7 @@ class EventError:
         JS_NO_COLUMN: "Cannot apply sourcemap because stacktrace frame is missing column information",
         JS_MISSING_ROW_OR_COLUMN: "Cannot apply sourcemap because frame is missing row or column information",
         JS_MISSING_SOURCE: "Source code was not found",
+        JS_MISSING_ORIGINAL_CODE: "Original source code was not found.",
         JS_INVALID_SOURCEMAP: "Sourcemap was invalid or not parseable",
         JS_TOO_MANY_REMOTE_SOURCES: "The maximum number of remote source requests was made",
         JS_INVALID_SOURCE_ENCODING: "File was not encoded properly",

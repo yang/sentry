@@ -7,6 +7,7 @@ export enum JavascriptProcessingErrors {
   JS_NO_COLUMN = 'js_no_column', // deprecated
   JS_MISSING_ROW_OR_COLUMN = 'js_missing_row_or_column',
   JS_MISSING_SOURCE = 'js_no_source',
+  JS_MISSING_ORIGINAL_CODE = 'js_no_original code',
   JS_INVALID_SOURCEMAP = 'js_invalid_sourcemap',
   JS_TOO_MANY_REMOTE_SOURCES = 'js_too_many_sources',
   JS_INVALID_SOURCE_ENCODING = 'js_invalid_source_encoding',
