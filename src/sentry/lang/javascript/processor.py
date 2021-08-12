@@ -930,7 +930,7 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
         `processing_task` is all of the frames we're trying to process, indexed
         by both stacktrace and processor.
         """
-        frame = processable_frame.frame
+        incoming_frame = processable_frame.frame
         token = None
 
         sourceview_cache = self.sourceview_cache
@@ -939,71 +939,92 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
         sourcemap_applied = False
 
         # can't demangle if there's no filename
-        if not frame.get("abs_path"):
+        if not incoming_frame.get("abs_path"):
             return  # skip frame with no error
 
         # also can't demangle node's internal modules
         # therefore we only process user-land frames (starting with /)
         # or those created by bundle/webpack internals
-        if self.data.get("platform") == "node" and not frame.get("abs_path").startswith(
+        if self.data.get("platform") == "node" and not incoming_frame.get("abs_path").startswith(
             ("/", "app:", "webpack:")
         ):
             return  # skip frame with no error
 
-        errors = sourceview_cache.get_errors(frame["abs_path"])
-        if errors:
-            all_errors.extend(errors)
+        fetching_errors = sourceview_cache.get_errors(incoming_frame["abs_path"])
+        if fetching_errors:
+            all_errors.extend(fetching_errors)
 
         # we also need line and column numbers
-        if not frame.get("lineno") or not frame.get("colno"):
+        if not incoming_frame.get("lineno") or not incoming_frame.get("colno"):
             all_errors.append(
                 {
                     "type": EventError.JS_MISSING_ROW_OR_COLUMN,
-                    "url": http.expose_url(frame["abs_path"]),
+                    "url": http.expose_url(incoming_frame["abs_path"]),
+                    "row": incoming_frame.get("lineno"),
+                    "column": incoming_frame.get("colno"),
                     "phase": "process_frame.precheck",
                 }
             )
             return None, None, all_errors
 
-        # This might fail but that's okay, we try with a different path a
-        # bit later down the road.
-        source = self.get_sourceview(frame["abs_path"])
+        # finally, the line and column numbers must be valid (greater than 0,
+        # since both are 1-indexed in stacktraces)
+        if incoming_frame["lineno"] <= 0 or incoming_frame["colno"] <= 0:
+            all_errors.append(
+                {
+                    "type": EventError.JS_INVALID_ROW_OR_COLUMN,
+                    "url": http.expose_url(incoming_frame["abs_path"]),
+                    "row": incoming_frame["lineno"],
+                    "column": incoming_frame["colno"],
+                    "phase": "process_frame.precheck",
+                }
+            )
+            return None, None, all_errors
+
+        source = self.get_sourceview(incoming_frame["abs_path"])
+        # TODO (kmclb) at this point, if `source` (which is the minified source)
+        # is None, there's nothing more we're going to be able to do - no
+        # minified file means no `sourceMappingURL`, no `sourceMappingURL` means
+        # no sourcemap, and no sourcemap means no sourcemapping. Is there ever a
+        # time we *wouldn't* want to bail here? (figure out if we need to set
+        # `in_app` first)
 
         in_app = None
-        new_frame = dict(frame)
-        raw_frame = dict(frame)
+        new_frame = dict(incoming_frame)
+        raw_frame = dict(incoming_frame)
 
-        sourcemap_url, sourcemap_view = sourcemaps_cache.get_link(frame["abs_path"])
-        self.sourcemaps_touched.add(sourcemap_url)
+        sourcemap_url, sourcemap_view = sourcemaps_cache.get_link(incoming_frame["abs_path"])
+        if sourcemap_url:
+            self.sourcemaps_touched.add(sourcemap_url)
         if sourcemap_view:
             if is_data_uri(sourcemap_url):
-                sourcemap_label = frame["abs_path"]
+                sourcemap_label = f"{http.expose_url(incoming_frame['abs_path'])} (inline)"
             else:
-                sourcemap_label = sourcemap_url
+                sourcemap_label = http.expose_url(sourcemap_url)
 
-            sourcemap_label = http.expose_url(sourcemap_label)
-
-            if frame.get("function"):
-                minified_function_name = frame["function"]
-                minified_source = self.get_sourceview(frame["abs_path"])
+            if incoming_frame.get("function"):
+                minified_function_name = incoming_frame["function"]
+                minified_source = self.get_sourceview(incoming_frame["abs_path"])
             else:
                 minified_function_name = minified_source = None
 
             try:
-                # Errors are 1-indexed in the frames, so we need to -1 to get
-                # zero-indexed value from tokens.
-                assert frame["lineno"] > 0, "line numbers are 1-indexed"
+                # Subtract 1 because line numbers are 1-indexed in frames, but
+                # 0-indexed in SourceMapViews
                 token = sourcemap_view.lookup(
-                    frame["lineno"] - 1, frame["colno"] - 1, minified_function_name, minified_source
+                    incoming_frame["lineno"] - 1,
+                    incoming_frame["colno"] - 1,
+                    minified_function_name,
+                    minified_source,
                 )
             except Exception:
                 token = None
                 all_errors.append(
                     {
                         "type": EventError.JS_INVALID_STACKFRAME_LOCATION,
-                        "column": frame.get("colno"),
-                        "row": frame.get("lineno"),
-                        "source": frame["abs_path"],
+                        "row": incoming_frame.get("lineno"),
+                        "column": incoming_frame.get("colno"),
+                        "source": incoming_frame["abs_path"],
                     }
                 )
 
@@ -1011,8 +1032,9 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
             processable_frame.data["token"] = token
 
             # Add sourcemap name to frame data
-            new_frame["data"] = dict(frame.get("data") or {}, sourcemap=sourcemap_label)
+            new_frame["data"] = dict(incoming_frame.get("data") or {}, sourcemap=sourcemap_label)
 
+            # Keep track of the fact that we tried (even if it didn't work)
             sourcemap_applied = True
 
             if token is not None:
@@ -1020,15 +1042,24 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
                 abs_path = non_standard_url_join(sourcemap_url, token.src)
 
                 logger.debug(
-                    "Mapping compressed source %r to mapping in %r", frame["abs_path"], abs_path
+                    "Mapping compressed source %r to mapping in %r",
+                    incoming_frame["abs_path"],
+                    abs_path,
                 )
                 # this is the original source code
+                # TODO (kmclb) will this ever be None? Would we ever get a token
+                # back without original source code?
                 source = self.get_sourceview(abs_path)
 
             if source is None:
-                errors = sourceview_cache.get_errors(abs_path)
-                if errors:
-                    all_errors.extend(errors)
+                # TODO (kmclb) we already did this above (as it stands, how is
+                # it that we don't end up with two copies of the fetching
+                # errors?). Also, would bailing early if we have no minified
+                # source have any effect on this check, either the inner or the
+                # outer one?
+                fetching_errors = sourceview_cache.get_errors(abs_path)
+                if fetching_errors:
+                    all_errors.extend(fetching_errors)
                 else:
                     all_errors.append(
                         {
@@ -1038,8 +1069,9 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
                     )
 
             if token is not None:
-                # the tokens are zero indexed, so offset correctly
-                # `src_line` and `src_col` are the location in the original source code
+                # Reverse the subtracting we did before, since now we're going
+                # the other direction (`src_line` and `src_col` are the location
+                # in the original source code)
                 new_frame["lineno"] = token.src_line + 1
                 new_frame["colno"] = token.src_col + 1
 
@@ -1065,10 +1097,13 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
                 if original_function_name is not None:
                     new_frame["function"] = original_function_name
 
+                # this is the name of the original source file
                 filename = token.src
+
                 # special case webpack support
-                # abs_path will always be the full path with webpack:/// prefix.
-                # filename will be relative to that
+                # `abs_path` will always be the full path with `webpack:///` prefix,
+                # and filename will be relative to that (`abs_path` here is the
+                # path to the original source file)
                 if abs_path.startswith("webpack:"):
                     filename = abs_path
                     # webpack seems to use ~ to imply "relative to resolver root"
@@ -1111,7 +1146,9 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
 
                 new_frame["abs_path"] = abs_path
                 new_frame["filename"] = filename
-                if not frame.get("module") and abs_path.startswith(
+                # TODO (kmclb) in the webpack case we would have already set
+                # `module` - do we want to overwrite?
+                if not incoming_frame.get("module") and abs_path.startswith(
                     ("http:", "https:", "webpack:", "app:")
                 ):
                     new_frame["module"] = generate_module(abs_path)
@@ -1123,16 +1160,29 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
 
         # TODO: theoretically a minified source could point to
         # another mapped, minified source
+
+        # `expand_frame` mutates the frame in place; `changed_frame` is a
+        # boolean indicating whether `expand_frame` had any effect. `source` at
+        # this point might be the minified source (if we have that but for
+        # whatever reason don't have the original source code) or the original
+        # source (if all has gone well)
         changed_frame = self.expand_frame(new_frame, source=source)
 
         # If we did not manage to match but we do have a line or column
         # we want to report an error here.
+
+        # TODO - needs to be two errors - one if we have all the code, incl
+        # originals, and still have no context line - then the location is
+        # invalid - and one if we have minimized code and a sourcemap and got a
+        # location in the original code but we don't have original code to check
+        # - then we're missing the original code (check that we wouldn't already
+        #   have bailed in that case, and for the first case, check the error message)
         if not new_frame.get("context_line") and source and new_frame.get("colno") is not None:
             all_errors.append(
                 {
                     "type": EventError.JS_INVALID_SOURCEMAP_LOCATION,
-                    "column": new_frame["colno"],
                     "row": new_frame["lineno"],
+                    "column": new_frame["colno"],
                     "source": new_frame["abs_path"],
                 }
             )
@@ -1140,7 +1190,7 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
         changed_raw = sourcemap_applied and self.expand_frame(raw_frame)
 
         if sourcemap_applied or all_errors or changed_frame or changed_raw:
-            # In case we are done processing, we iterate over all errors that we got
+            # Now that we are done processing, we iterate over all errors that we got
             # and we filter out all `JS_MISSING_SOURCE` errors since we consider if we have
             # a `context_line` we have a symbolicated frame and we don't need to show the error
             has_context_line = bool(new_frame.get("context_line"))
@@ -1159,7 +1209,9 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
 
     def expand_frame(self, frame, source=None):
         """
-        Mutate the given frame to include pre- and post-context lines.
+        Mutate the given frame to include context and pre- and post-context lines.
+
+        Returns a boolean indicating success or failure.
         """
 
         if frame.get("lineno") is not None:
@@ -1177,6 +1229,9 @@ class JavaScriptStacktraceProcessor(StacktraceProcessor):
 
     def get_sourceview(self, filename):
         if filename not in self.sourceview_cache:
+            # TODO (kmclb) check the errors, because if it's not there, it might
+            # be because we already tried and came up empty, in which case
+            # there's no point in trying again
             self.cache_source(filename)
         return self.sourceview_cache.get(filename)
 
