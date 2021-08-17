@@ -225,7 +225,10 @@ def fetch_file(
                     }
                 else:
                     logger.exception(f"{exc}")
-                    error = {"type": EventError.UNKNOWN_ERROR}
+                    error = {
+                        "type": EventError.UNKNOWN_ERROR,
+                        "value": f"{type(exc)}",
+                    }
 
                 # TODO(dcramer): we want to be less aggressive on disabling domains
                 if domain_lock_enabled:

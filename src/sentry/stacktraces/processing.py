@@ -83,6 +83,7 @@ class ProcessableFrame:
         return rv
 
 
+# TODO (kmclb) in what sense is this a "task?"
 class StacktraceProcessingTask:
     """
     Container holding frames to be processed, grouped by both stacktrace and processor.
@@ -93,7 +94,7 @@ class StacktraceProcessingTask:
 
         # a dictionary of the form `stacktraceInfo -> list of ProcessableFrame objects`
         self.processable_stacktraces = processable_stacktraces
-        # a dictionary of the form `processor -> list of ProcessableFrame object`
+        # a dictionary of the form `processor -> list of ProcessableFrame objects`
         self.processors = processors
 
     def close(self):
@@ -213,7 +214,7 @@ def find_stacktraces_in_data(data, include_raw=False, with_exceptions=False):
     for exc in get_path(data, "exception", "values", filter=True, default=()):
         _report_stack(exc.get("stacktrace"), exc, is_exception=with_exceptions)
 
-    _report_stack(data.get("stacktrace"), None)
+    _report_stack(data.get("stacktrace"), data)
 
     for thread in get_path(data, "threads", "values", filter=True, default=()):
         _report_stack(thread.get("stacktrace"), thread)
@@ -415,8 +416,6 @@ def process_single_stacktrace(processing_task, stacktrace_info, processable_fram
         else:
             processed_frames.append(bare_frame)
 
-        # TODO - is this what we want? In a case of no expand_processed but yes
-        # expand_raw, we'll end up with two copies of expand_raw
         if expand_raw is not None:
             raw_frames.extend(expand_raw)
             changed_raw = True
@@ -494,7 +493,8 @@ def get_stacktrace_processing_task(infos, processors):
     by_stacktrace_info = OrderedDict()
 
     for info in infos:
-        # each frame in processable_frames is a ProcessableFrame instance
+        # these aren't just frames which are processable - they're actual
+        # ProcessableFrame objects
         processable_frames = get_processable_frames(info, processors)
         for processable_frame in processable_frames:
             processable_frame.processor.preprocess_frame(processable_frame)
@@ -516,7 +516,7 @@ def get_stacktrace_processing_task(infos, processors):
 
 
 def dedup_errors(errors):
-    # This operation scales bad but we do not expect that many items to
+    # This operation scales badly but we do not expect that many items to
     # end up in rv, so that should be okay enough to do.
     rv = []
     for error in errors:

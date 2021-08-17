@@ -293,7 +293,7 @@ class ProjectGeneralSettings extends AsyncView<Props, State> {
               <PanelAlert type="info">
                 <TextBlock noMargin>
                   {tct(
-                    'Configure origin URLs which Sentry should accept events from. This is used for communication with clients like [link].',
+                    'Configure origin URLs from which Sentry should accept events. This is used for communication with clients like [link].',
                     {
                       link: (
                         <a href="https://github.com/getsentry/sentry-javascript">
