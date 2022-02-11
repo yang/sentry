@@ -16,7 +16,7 @@ from sentry.db.models import (
 from sentry.db.models.fields.jsonfield import JSONField
 from sentry.db.models.manager import BaseManager
 from sentry.signals import integration_added
-from sentry.tasks.code_owners import update_code_owners_schema
+from sentry.tasks.codeowners import update_code_owners_schema
 
 logger = logging.getLogger(__name__)
 
