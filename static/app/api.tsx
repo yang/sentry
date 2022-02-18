@@ -66,6 +66,10 @@ export type ResponseMeta<R = any> = {
    * Get a header value from the response
    */
   getResponseHeader: (header: string) => string | null;
+  /**
+   * The body of the request
+   */
+  requestBody: any;
 };
 
 /**
@@ -427,6 +431,7 @@ export class Client {
             scope.setLevel(Severity.Warning);
             scope.setTag('http.statusCode', String(resp.status));
             scope.setTag('error.reason', errorThrown);
+            scope.setExtra('request body', resp.requestBody);
             Sentry.captureException(errorObjectToUse);
           })
         );
@@ -533,6 +538,7 @@ export class Client {
           responseJSON,
           responseText,
           getResponseHeader: (header: string) => response.headers.get(header),
+          requestBody: body,
         };
 
         // Respect the response content-type header
@@ -557,6 +563,7 @@ export class Client {
         run(Sentry =>
           Sentry.withScope(scope => {
             scope.setLevel(Severity.Warning);
+            scope.setExtra('request body', body);
             Sentry.captureException(err);
           })
         );

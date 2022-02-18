@@ -241,6 +241,7 @@ describe('ProjectAlertsCreate', function () {
       });
     });
 
+    jest.setTimeout(10000);
     it('updates values and saves', async function () {
       const {
         wrapper: {getAllByText, getByPlaceholderText, getByText},

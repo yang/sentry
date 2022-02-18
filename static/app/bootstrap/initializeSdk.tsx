@@ -60,8 +60,10 @@ function getSentryIntegrations(hasReplays: boolean = false, routes?: Function) {
  * entrypoints require this.
  */
 export function initializeSdk(config: Config, {routes}: {routes?: Function} = {}) {
+  const release = SENTRY_RELEASE_VERSION ?? config.sentryConfig?.release;
+
   if (config.dsn_requests) {
-    initApiSentryClient(config.dsn_requests);
+    initApiSentryClient(config.dsn_requests, release);
   }
 
   const {apmSampling, sentryConfig, userIdentity} = config;
@@ -80,7 +82,7 @@ export function initializeSdk(config: Config, {routes}: {routes?: Function} = {}
      * Frontend can be built with a `SENTRY_RELEASE_VERSION` environment variable for release string, useful if frontend is
      * deployed separately from backend.
      */
-    release: SENTRY_RELEASE_VERSION ?? sentryConfig?.release,
+    release,
     whitelistUrls: SPA_DSN
       ? ['localhost', 'dev.getsentry.net', 'sentry.dev', 'webpack-internal://']
       : sentryConfig?.whitelistUrls,

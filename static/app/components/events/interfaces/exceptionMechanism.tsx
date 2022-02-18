@@ -23,7 +23,15 @@ type Props = {
 class ExceptionMechanism extends Component<Props> {
   render() {
     const mechanism = this.props.data;
-    const {type, description, help_link, handled, meta = {}, data = {}} = mechanism;
+    const {
+      type,
+      description,
+      help_link,
+      handled,
+      synthetic,
+      meta = {},
+      data = {},
+    } = mechanism;
     const {errno, signal, mach_exception} = meta;
 
     const linkElement = help_link && isUrl(help_link) && (
@@ -45,6 +53,21 @@ class ExceptionMechanism extends Component<Props> {
       </Hovercard>
     );
 
+    const syntheticDescriptionElement = description && (
+      <Hovercard
+        header={
+          <span>
+            <Details>{t('Synthetic Exception')}</Details> {linkElement}
+          </span>
+        }
+        body={
+          "This means the exception which was caught was not an instance of `Error`, and didn't have a stacktrace. Instead we've used the stacktrace leading to the point where the exception was captured, if available."
+        }
+      >
+        <StyledIconInfo size="14px" />
+      </Hovercard>
+    );
+
     const pills = [
       <Pill key="mechanism" name="mechanism" value={type || 'unknown'}>
         {descriptionElement || linkElement}
@@ -53,6 +76,15 @@ class ExceptionMechanism extends Component<Props> {
 
     if (!isNil(handled)) {
       pills.push(<Pill key="handled" name="handled" value={handled} />);
+    }
+
+    // TODO - how to get both the value and the info thing to show up?
+    if (synthetic) {
+      pills.push(
+        <Pill key="synthetic" name="type" value="synthetic">
+          {syntheticDescriptionElement}
+        </Pill>
+      );
     }
 
     if (errno) {

@@ -52,7 +52,10 @@ const Pill = React.memo(({name, value, children, type, className}: Props) => {
   return (
     <StyledPill type={type ?? valueType} className={className}>
       <PillName>{name}</PillName>
-      <PillValue>{children ?? renderValue}</PillValue>
+      // TODO how to deal with no value or value which is normally suppressed?
+      {<PillValue>{renderValue}</PillValue>}
+      // TODO also how to make sure there aren't two borders in between?
+      {children && <PillValue>{children}</PillValue>}
     </StyledPill>
   );
 });
