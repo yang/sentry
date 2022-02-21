@@ -23,23 +23,19 @@ function Flamegraph(props: FlamegraphProps): React.ReactElement {
   const [{sorting, view, colorCoding}, dispatch] = useFlamegraphPreferences();
 
   const [flamegraph, setFlamegraph] = useState(
-    new FlamegraphModel(
-      props.profiles.profiles[0],
-      0,
-      view === 'bottom up',
-      sorting === 'left heavy'
-    )
+    new FlamegraphModel(props.profiles.profiles[0], 0, {
+      inverted: view === 'bottom up',
+      leftHeavy: sorting === 'left heavy',
+    })
   );
 
   const onImport = useCallback(
     profile => {
       setFlamegraph(
-        new FlamegraphModel(
-          profile.profiles[0],
-          0,
-          view === 'bottom up',
-          sorting === 'left heavy'
-        )
+        new FlamegraphModel(profile.profiles[0], 0, {
+          inverted: view === 'bottom up',
+          leftHeavy: sorting === 'left heavy',
+        })
       );
     },
     [view === 'bottom up', sorting === 'left heavy']
@@ -48,12 +44,10 @@ function Flamegraph(props: FlamegraphProps): React.ReactElement {
   const onProfileIndexChange = useCallback(
     index => {
       setFlamegraph(
-        new FlamegraphModel(
-          props.profiles.profiles[index],
-          index,
-          view === 'bottom up',
-          sorting === 'left heavy'
-        )
+        new FlamegraphModel(props.profiles.profiles[index], index, {
+          inverted: view === 'bottom up',
+          leftHeavy: sorting === 'left heavy',
+        })
       );
     },
     [view === 'bottom up', sorting === 'left heavy']
@@ -61,12 +55,10 @@ function Flamegraph(props: FlamegraphProps): React.ReactElement {
 
   useEffect(() => {
     setFlamegraph(
-      new FlamegraphModel(
-        props.profiles.profiles[0],
-        0,
-        view === 'bottom up',
-        sorting === 'left heavy'
-      )
+      new FlamegraphModel(props.profiles.profiles[0], 0, {
+        inverted: view === 'bottom up',
+        leftHeavy: sorting === 'left heavy',
+      })
     );
   }, [view === 'bottom up', sorting === 'left heavy']);
 

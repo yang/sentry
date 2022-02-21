@@ -28,23 +28,19 @@ export const EventedTrace = () => {
   const [{sorting, view, colorCoding}, dispatch] = useFlamegraphPreferences();
 
   const [flamegraph, setFlamegraph] = React.useState(
-    new Flamegraph(
-      profiles.profiles[0],
-      0,
-      view === 'bottom up',
-      sorting === 'left heavy'
-    )
+    new Flamegraph(profiles.profiles[0], 0, {
+      inverted: view === 'bottom up',
+      leftHeavy: sorting === 'left heavy',
+    })
   );
 
   const onImport = React.useCallback(
     profile => {
       setFlamegraph(
-        new Flamegraph(
-          profile.profiles[0],
-          0,
-          view === 'bottom up',
-          sorting === 'left heavy'
-        )
+        new Flamegraph(profile.profiles[0], 0, {
+          inverted: view === 'bottom up',
+          leftHeavy: sorting === 'left heavy',
+        })
       );
     },
     [view === 'bottom up', sorting === 'left heavy']
@@ -53,12 +49,10 @@ export const EventedTrace = () => {
   const onProfileIndexChange = React.useCallback(
     index => {
       setFlamegraph(
-        new Flamegraph(
-          profiles.profiles[index],
-          index,
-          view === 'bottom up',
-          sorting === 'left heavy'
-        )
+        new Flamegraph(profiles.profiles[index], index, {
+          inverted: view === 'bottom up',
+          leftHeavy: sorting === 'left heavy',
+        })
       );
     },
     [view === 'bottom up', sorting === 'left heavy']
@@ -66,12 +60,10 @@ export const EventedTrace = () => {
 
   React.useEffect(() => {
     setFlamegraph(
-      new Flamegraph(
-        profiles.profiles[0],
-        0,
-        view === 'bottom up',
-        sorting === 'left heavy'
-      )
+      new Flamegraph(profiles.profiles[0], 0, {
+        inverted: view === 'bottom up',
+        leftHeavy: sorting === 'left heavy',
+      })
     );
   }, [view === 'bottom up', sorting === 'left heavy']);
 
