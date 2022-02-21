@@ -5,7 +5,7 @@ import {mat3, vec2} from 'gl-matrix';
 import {CanvasPoolManager, CanvasScheduler} from 'sentry/utils/profiling/canvasScheduler';
 import {DifferentialFlamegraph} from 'sentry/utils/profiling/differentialFlamegraph';
 import {Flamegraph} from 'sentry/utils/profiling/flamegraph';
-import {FlamegraphPreferences} from 'sentry/utils/profiling/flamegraph/useFlamegraphPreferences';
+import {useFlamegraphPreferencesValue} from 'sentry/utils/profiling/flamegraph/useFlamegraphPreferences';
 import {useFlamegraphTheme} from 'sentry/utils/profiling/flamegraph/useFlamegraphTheme';
 import {FlamegraphFrame} from 'sentry/utils/profiling/flamegraphFrame';
 import {Rect, watchForResize} from 'sentry/utils/profiling/gl/utils';
@@ -19,18 +19,16 @@ import {BoundTooltip} from './BoundTooltip';
 
 interface FlamegraphZoomViewProps {
   canvasPoolManager: CanvasPoolManager;
-  colorCoding: FlamegraphPreferences['colorCoding'];
   flamegraph: Flamegraph | DifferentialFlamegraph;
-  highlightRecursion: boolean;
   showSelectedNodeStack?: boolean;
 }
 
 function FlamegraphZoomView({
   flamegraph,
   canvasPoolManager,
-  colorCoding,
-  highlightRecursion,
 }: FlamegraphZoomViewProps): React.ReactElement {
+  const flamegraphPreferences = useFlamegraphPreferencesValue();
+
   const [scheduler, setScheduler] = React.useState<CanvasScheduler | null>(null);
   const [flamegraphCanvasRef, setFlamegraphCanvasRef] =
     React.useState<HTMLCanvasElement | null>(null);
@@ -85,8 +83,7 @@ function FlamegraphZoomView({
       flamegraphTheme,
       flamegraph,
       canvasPoolManager,
-      colorCoding,
-      highlightRecursion,
+      flamegraphPreferences.colorCoding,
     ]
   );
 

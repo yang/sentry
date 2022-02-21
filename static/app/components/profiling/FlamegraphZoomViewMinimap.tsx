@@ -4,7 +4,7 @@ import {mat3, vec2} from 'gl-matrix';
 
 import {CanvasPoolManager, CanvasScheduler} from 'sentry/utils/profiling/canvasScheduler';
 import {Flamegraph} from 'sentry/utils/profiling/flamegraph';
-import {FlamegraphPreferences} from 'sentry/utils/profiling/flamegraph/useFlamegraphPreferences';
+import {useFlamegraphPreferencesValue} from 'sentry/utils/profiling/flamegraph/useFlamegraphPreferences';
 import {useFlamegraphTheme} from 'sentry/utils/profiling/flamegraph/useFlamegraphTheme';
 import {FlamegraphFrame} from 'sentry/utils/profiling/flamegraphFrame';
 import {Rect, watchForResize} from 'sentry/utils/profiling/gl/utils';
@@ -14,19 +14,16 @@ import {useMemoWithPrevious} from 'sentry/utils/useMemoWithPrevious';
 
 interface FlamegraphZoomViewMinimapProps {
   canvasPoolManager: CanvasPoolManager;
-  colorCoding: FlamegraphPreferences['colorCoding'];
   flamegraph: Flamegraph;
-  highlightRecursion: boolean;
   height?: number;
 }
 
 function FlamegraphZoomViewMinimap({
   canvasPoolManager,
   flamegraph,
-  colorCoding,
-  highlightRecursion,
   height = 100,
 }: FlamegraphZoomViewMinimapProps): React.ReactElement {
+  const flamegraphPreferences = useFlamegraphPreferencesValue();
   const [flamegraphMiniMapCanvasRef, setFlamegraphMiniMapRef] =
     React.useState<HTMLCanvasElement | null>(null);
   const [flamegraphMiniMapOverlayCanvasRef, setFlamegraphMiniMapOverlayCanvasRef] =
@@ -70,8 +67,7 @@ function FlamegraphZoomViewMinimap({
       flamegraphMiniMapCanvasRef,
       flamegraph,
       flamegraphTheme,
-      colorCoding,
-      highlightRecursion,
+      flamegraphPreferences.colorCoding,
     ]
   );
 
