@@ -33,6 +33,7 @@ import {
   SelectValue,
   TagCollection,
 } from 'sentry/types';
+import {defined} from 'sentry/utils';
 import trackAdvancedAnalyticsEvent from 'sentry/utils/analytics/trackAdvancedAnalyticsEvent';
 import Measurements from 'sentry/utils/measurements/measurements';
 import {SessionMetric} from 'sentry/utils/metrics/fields';
@@ -77,6 +78,8 @@ export type DashboardWidgetModalOptions = {
   defaultWidgetQuery?: WidgetQuery;
   displayType?: DisplayType;
   end?: DateString;
+  metricFields?: MetricMeta[];
+  metricTags?: MetricTag[];
   onAddLibraryWidget?: (widgets: Widget[]) => void;
   onAddWidget?: (data: Widget) => void;
   onUpdateWidget?: (nextWidget: Widget) => void;
@@ -104,6 +107,8 @@ type State = {
   displayType: Widget['displayType'];
   interval: Widget['interval'];
   loading: boolean;
+  loadingMetricsFields: boolean;
+  loadingMetricsTags: boolean;
   metricFields: MetricMeta[];
   metricTags: MetricTag[];
   queries: Widget['queries'];
@@ -152,7 +157,14 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
 
-    const {widget, defaultWidgetQuery, defaultTitle, displayType} = props;
+    const {
+      widget,
+      defaultWidgetQuery,
+      defaultTitle,
+      displayType,
+      metricTags,
+      metricFields,
+    } = props;
     if (!widget) {
       this.state = {
         title: defaultTitle ?? '',
@@ -161,9 +173,11 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
         queries: [defaultWidgetQuery ? {...defaultWidgetQuery} : {...newDiscoverQuery}],
         errors: undefined,
         loading: !!this.omitDashboardProp,
+        loadingMetricsTags: false,
+        loadingMetricsFields: false,
         dashboards: [],
-        metricTags: [],
-        metricFields: [],
+        metricTags: defined(metricTags) ? metricTags : [],
+        metricFields: defined(metricFields) ? metricFields : [],
         userHasModified: false,
         widgetType: WidgetType.DISCOVER,
       };
@@ -177,6 +191,10 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
       queries: normalizeQueries(widget.displayType, widget.queries),
       errors: undefined,
       loading: false,
+      loadingMetricsTags:
+        widget.widgetType === WidgetType.METRICS && !!!defined(metricTags),
+      loadingMetricsFields:
+        widget.widgetType === WidgetType.METRICS && defined(metricFields),
       dashboards: [],
       metricTags: [],
       metricFields: [],
@@ -533,6 +551,7 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
     const metricTags = await fetchMetricsTags(api, organization.slug, projects);
     this.setState({
       metricTags,
+      loadingMetricsTags: false,
     });
   }
 
@@ -546,6 +565,7 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
     );
     this.setState({
       metricFields: filteredFields,
+      loadingMetricsFields: false,
     });
   }
 
@@ -631,6 +651,10 @@ class AddDashboardWidgetModal extends React.Component<Props, State> {
         measurementKeys,
         spanOperationBreakdownKeys: SPAN_OP_BREAKDOWN_FIELDS,
       });
+
+    if (state.loadingMetricsFields || state.loadingMetricsTags) {
+      return null;
+    }
 
     switch (state.widgetType) {
       case WidgetType.ISSUE:
