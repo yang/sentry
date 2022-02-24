@@ -44,14 +44,14 @@ export type AnomalyPayload = {
   yhat_upper: AnomalyStatsData;
 };
 
-function transformStatsTimes(stats: AnomalyStatsData, delta: number) {
-  stats.data.forEach(d => (d[0] = delta + d[0] * 1000));
+function transformStatsTimes(stats: AnomalyStatsData) {
+  stats.data.forEach(d => (d[0] = d[0] * 1000));
   return stats;
 }
-function transformAnomaliesTimes(anoms: AnomalyInfo[], delta: number) {
+function transformAnomaliesTimes(anoms: AnomalyInfo[]) {
   anoms.forEach(a => {
-    a.start = delta + a.start * 1000;
-    a.end = delta + a.end * 1000;
+    a.start = a.start * 1000;
+    a.end = a.end * 1000;
   });
   return anoms;
 }
@@ -62,10 +62,10 @@ function transformPayload(payload: AnomalyPayload): AnomalyPayload {
     return newPayload;
   }
 
-  newPayload.y = transformStatsTimes(payload.y, 0);
-  newPayload.yhat_upper = transformStatsTimes(payload.yhat_upper, 0);
-  newPayload.yhat_lower = transformStatsTimes(payload.yhat_lower, 0);
-  newPayload.anomalies = transformAnomaliesTimes(payload.anomalies, 0);
+  newPayload.y = transformStatsTimes(payload.y);
+  newPayload.yhat_upper = transformStatsTimes(payload.yhat_upper);
+  newPayload.yhat_lower = transformStatsTimes(payload.yhat_lower);
+  newPayload.anomalies = transformAnomaliesTimes(payload.anomalies);
   return newPayload;
 }
 
