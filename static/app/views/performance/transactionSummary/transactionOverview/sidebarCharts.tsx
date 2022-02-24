@@ -180,12 +180,6 @@ function SidebarCharts({
                   s => s.seriesName.includes('epm') || s.seriesName.includes('tpm')
                 );
                 if (epmSeries && results.data) {
-                  // temp
-                  epmSeries.data = results.data.y.data.map(([name, [{count}]]) => ({
-                    name,
-                    value: count,
-                  }));
-                  // end temp
                   epmSeries.markPoint = MarkPoint({
                     data: results.data.anomalies.map(a => ({
                       name: a.id,
