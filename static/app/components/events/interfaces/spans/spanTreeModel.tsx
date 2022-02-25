@@ -301,7 +301,79 @@ class SpanTreeModel {
       }
     }
 
-    const {descendants} = (hideSpanTree ? [] : descendantsSource).reduce(
+    function checkForSiblings(descendants: SpanTreeModel[]) {
+      if (descendants.length < 3) {
+        return false;
+      }
+
+      let identicalCount = 0;
+      const [firstSpan, ..._] = descendants;
+      let lastSpanDesc = firstSpan.span.description;
+
+      if (lastSpanDesc !== 'frame') {
+        return false;
+      }
+
+      for (const spanModel of descendants) {
+        const currentSpanDesc = spanModel.span.description;
+        if (identicalCount === descendants.length - 1) {
+          if (identicalCount > 3) {
+            return true;
+          }
+          identicalCount = 0;
+        } else {
+          identicalCount++;
+        }
+        lastSpanDesc = currentSpanDesc;
+      }
+
+      return false;
+    }
+
+    /*
+
+      const descendants = [
+        'db.query',
+        'db.query',
+        'db.query',
+        'db.query',
+        'http.server',
+        'db.query',
+        'db.query',
+        'db.query',
+        'db.query',
+      ];
+
+      const siblifiedDescendants = [
+        [ // -> 'span_group_sibling'
+        // each of the spans inside the sibling group also need to have this span code recursively called on them
+        // in case they are also siblings / trees / groups etc.
+        // Might not matter since siblings can't have children for now, might consider how this would look for later.
+          'db.query',
+          'db.query',
+          'db.query',
+          'db.query',
+        ],
+        [
+          'http.server', // -> regular descendants reducer.
+        ],
+        [ // -> 'span_group_sibling'
+          'db.query',
+          'db.query',
+          'db.query',
+          'db.query',
+        ]
+      ];
+
+      ['grouped span']
+    */
+
+    const safeDescendants = hideSpanTree ? [] : descendantsSource;
+    const hasSiblings = checkForSiblings(safeDescendants);
+
+    // Split up descendants into groups of 'siblings' and regular spans to be reduced.
+
+    const {descendants: _desc} = safeDescendants.reduce(
       (
         acc: {
           descendants: EnhancedProcessedSpanType[];
@@ -350,6 +422,19 @@ class SpanTreeModel {
         previousSiblingEndTimestamp: undefined,
       }
     );
+
+    const fakeSiblingSpan: EnhancedProcessedSpanType = {
+      type: 'span_group_sibling',
+      span: this.span,
+      treeDepth: treeDepth - 1,
+      continuingTreeDepths,
+      spanGrouping: [wrappedSpan, ..._desc],
+      siblingCount: _desc.length,
+      showSpanGroup,
+      toggleSpanGroup: () => {},
+    };
+
+    const descendants = hasSiblings ? [fakeSiblingSpan] : _desc;
 
     if (this.isSpanFilteredOut(props)) {
       return [
