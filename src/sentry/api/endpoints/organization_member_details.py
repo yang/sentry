@@ -1,11 +1,13 @@
 from django.db import transaction
 from django.db.models import Q
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from sentry import ratelimits, roles
 from sentry.api.bases.organization import OrganizationEndpoint, OrganizationPermission
+from sentry.api.examples.organization_member_apis import basic_put_details_example
 from sentry.api.exceptions import ResourceDoesNotExist
 from sentry.api.serializers import (
     DetailedUserSerializer,
@@ -13,7 +15,11 @@ from sentry.api.serializers import (
     RoleSerializer,
     serialize,
 )
+from sentry.api.serializers.models import OrganizationMemberSerializer
 from sentry.api.serializers.rest_framework import ListField
+from sentry.apidocs.constants import RESPONSE_NOTFOUND, RESPONSE_UNAUTHORIZED
+from sentry.apidocs.decorators import public
+from sentry.apidocs.parameters import GLOBAL_PARAMS, SCIM_PARAMS
 from sentry.auth.superuser import is_active_superuser
 from sentry.models import (
     AuditLogEntryEvent,
@@ -56,11 +62,17 @@ def get_allowed_roles(request, organization, member=None):
     return (can_admin, allowed_roles)
 
 
-class OrganizationMemberSerializer(serializers.Serializer):
-    reinvite = serializers.BooleanField()
-    regenerate = serializers.BooleanField()
-    role = serializers.ChoiceField(choices=roles.get_choices(), required=True)
-    teams = ListField(required=False, allow_null=False)
+class OrganizationMemberRequestSerializer(serializers.Serializer):
+    reinvite = serializers.BooleanField(required=False)
+    regenerate = serializers.BooleanField(required=False)
+    role = serializers.ChoiceField(
+        choices=roles.get_choices(), required=True, help_text="The organization role of the member."
+    )
+    teams = ListField(
+        required=False,
+        allow_null=False,
+        help_text="The set of teams the member belongs to. If provided, this list overrides any existing memberships the user may have.",
+    )
 
 
 class RelaxedMemberPermission(OrganizationPermission):
@@ -79,6 +91,8 @@ class RelaxedMemberPermission(OrganizationPermission):
         return False
 
 
+@extend_schema(tags=["Members"])
+@public({"PUT"})
 class OrganizationMemberDetailsEndpoint(OrganizationEndpoint):
     permission_classes = [RelaxedMemberPermission]
 
@@ -130,7 +144,7 @@ class OrganizationMemberDetailsEndpoint(OrganizationEndpoint):
         return context
 
     def get(self, request: Request, organization, member_id) -> Response:
-        """Currently only returns allowed invite roles for member invite"""
+        """Returns information about an Organization Member."""
 
         try:
             member = self._get_member(request, organization, member_id)
@@ -143,13 +157,33 @@ class OrganizationMemberDetailsEndpoint(OrganizationEndpoint):
 
         return Response(context)
 
+    @extend_schema(
+        operation_id="Update an Organization Member",
+        parameters=[GLOBAL_PARAMS.ORG_SLUG, SCIM_PARAMS.MEMBER_ID],
+        request=OrganizationMemberRequestSerializer,
+        responses={
+            200: OrganizationMemberSerializer,
+            401: RESPONSE_UNAUTHORIZED,
+            404: RESPONSE_NOTFOUND,
+        },
+        examples=[
+            OpenApiExample(
+                "Update an Organization Member",
+                request_only=True,
+                value={"role": "member", "teams": ["frontend"]},
+                status_codes=["200"],
+            ),
+            basic_put_details_example,
+        ],
+    )
     def put(self, request: Request, organization, member_id) -> Response:
+        """Update an Organization Member's attributes"""
         try:
             om = self._get_member(request, organization, member_id)
         except OrganizationMember.DoesNotExist:
             raise ResourceDoesNotExist
 
-        serializer = OrganizationMemberSerializer(data=request.data, partial=True)
+        serializer = OrganizationMemberRequestSerializer(data=request.data, partial=True)
 
         if not serializer.is_valid():
             return Response(status=400)

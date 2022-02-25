@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from sentry import features, ratelimits, roles
 from sentry.api.bases.organization import OrganizationEndpoint, OrganizationPermission
-from sentry.api.examples.organization_member_index import basic_get_example
+from sentry.api.examples.organization_member_apis import basic_get_index_example
 from sentry.api.paginator import OffsetPaginator
 from sentry.api.serializers import serialize
 from sentry.api.serializers.models import organization_member as organization_member_serializers
@@ -164,7 +164,7 @@ class OrganizationMemberIndexEndpoint(OrganizationEndpoint):
                 List[organization_member_serializers.OrganizationMemberResponse],
             )
         },
-        examples=[basic_get_example],
+        examples=[basic_get_index_example],
     )
     def get(self, request: Request, organization) -> Response:
         """Query an Organization's Members."""
