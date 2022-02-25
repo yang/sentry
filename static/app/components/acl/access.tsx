@@ -1,18 +1,12 @@
-import * as React from 'react';
+import {useMemo} from 'react';
 
 import Alert from 'sentry/components/alert';
 import {IconInfo} from 'sentry/icons';
 import {t} from 'sentry/locale';
 import {Config, Organization, Scope} from 'sentry/types';
 import {isRenderFunc} from 'sentry/utils/isRenderFunc';
+import useOrganization from 'sentry/utils/useOrganization';
 import withConfig from 'sentry/utils/withConfig';
-import withOrganization from 'sentry/utils/withOrganization';
-
-const DEFAULT_NO_ACCESS_MESSAGE = (
-  <Alert type="error" icon={<IconInfo size="md" />}>
-    {t('You do not have sufficient permissions to access this.')}
-  </Alert>
-);
 
 // Props that function children will get.
 export type ChildRenderProps = {
@@ -20,24 +14,37 @@ export type ChildRenderProps = {
   hasSuperuser: boolean;
 };
 
-type ChildFunction = (props: ChildRenderProps) => React.ReactNode;
+type ChildFunction = (props: ChildRenderProps) => React.ReactElement;
 
-type DefaultProps = {
+type AccessProps = {
+  /**
+   * Children can be a node or a function as child.
+   */
+  children: React.ReactElement | ChildFunction;
+
+  /**
+   * Configuration from ConfigStore
+   */
+  config: Config;
+
   /**
    * List of required access levels
    */
-  access: Scope[];
+  access?: Scope[];
+  /**
+   * Requires superuser
+   */
+  isSuperuser?: boolean;
+  /**
+   * Organization override
+   */
+  organization?: Organization;
 
   /**
    * Custom renderer function for "no access" message OR `true` to use
    * default message. `false` will suppress message.
    */
-  renderNoAccessMessage: ChildFunction | boolean;
-
-  /**
-   * Requires superuser
-   */
-  isSuperuser?: boolean;
+  renderNoAccessMessage?: ChildFunction | boolean;
 
   /**
    * Should the component require all access levels or just one or more.
@@ -45,73 +52,53 @@ type DefaultProps = {
   requireAll?: boolean;
 };
 
-const defaultProps: DefaultProps = {
-  renderNoAccessMessage: false,
-  isSuperuser: false,
-  requireAll: true,
-  access: [],
-};
-
-type Props = {
-  /**
-   * Configuration from ConfigStore
-   */
-  config: Config;
-
-  /**
-   * Current Organization
-   */
-  organization: Organization;
-
-  /**
-   * Children can be a node or a function as child.
-   */
-  children?: React.ReactNode | ChildFunction;
-} & Partial<DefaultProps>;
-
 /**
  * Component to handle access restrictions.
  */
-class Access extends React.Component<Props> {
-  static defaultProps = defaultProps;
+function Access(props: AccessProps): React.ReactElement | null {
+  const contextOrganization = useOrganization();
+  const organization = useMemo(() => {
+    // We allow organization override via props, if one is present, we'll use that one
+    return props.organization ? props.organization : contextOrganization;
+  }, [props.organization, contextOrganization]);
 
-  render() {
-    const {
-      organization,
-      config,
-      access,
-      requireAll,
-      isSuperuser,
-      renderNoAccessMessage,
-      children,
-    } = this.props;
-
-    const {access: orgAccess} = organization || {access: []};
-    const method = requireAll ? 'every' : 'some';
-
-    const hasAccess = !access || access[method](acc => orgAccess.includes(acc));
-    const hasSuperuser = !!(config.user && config.user.isSuperuser);
-
-    const renderProps: ChildRenderProps = {
-      hasAccess,
-      hasSuperuser,
-    };
-
-    const render = hasAccess && (!isSuperuser || hasSuperuser);
-
-    if (!render && typeof renderNoAccessMessage === 'function') {
-      return renderNoAccessMessage(renderProps);
-    }
-    if (!render && renderNoAccessMessage) {
-      return DEFAULT_NO_ACCESS_MESSAGE;
+  const hasAccess = useMemo(() => {
+    if (!props.access?.length) {
+      return false;
     }
 
-    if (isRenderFunc<ChildFunction>(children)) {
-      return children(renderProps);
+    if (props.requireAll ?? true) {
+      return props.access.every(feature => organization.access.includes(feature));
     }
 
-    return render ? children : null;
+    return props.access.some(feature => organization.access.includes(feature));
+  }, [organization, props.requireAll, props.access]);
+
+  const hasSuperuser = !!props.config.user?.isSuperuser;
+  const render = hasAccess && (!props.isSuperuser || hasSuperuser);
+
+  if (!render) {
+    if (typeof props.renderNoAccessMessage === 'function') {
+      return props.renderNoAccessMessage({
+        hasAccess,
+        hasSuperuser,
+      });
+    }
+    if (props.renderNoAccessMessage) {
+      return (
+        <Alert type="error" icon={<IconInfo size="md" />}>
+          {t('You do not have sufficient permissions to access this.')}
+        </Alert>
+      );
+    }
+
+    // We do not render anything if user has no access and renderNoAccessMessage props is not passed
+    return null;
   }
+
+  return isRenderFunc<ChildFunction>(props.children)
+    ? props.children({hasAccess, hasSuperuser})
+    : props.children;
 }
 
-export default withOrganization(withConfig(Access));
+export default withConfig(Access);

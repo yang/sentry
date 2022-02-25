@@ -1,16 +1,17 @@
-import * as React from 'react';
+import React, {useMemo} from 'react';
 
+import ConfigStore from 'sentry/stores/configStore';
 import HookStore from 'sentry/stores/hookStore';
+import {useLegacyStore} from 'sentry/stores/useLegacyStore';
 import {Config, Organization, Project} from 'sentry/types';
 import {FeatureDisabledHooks} from 'sentry/types/hooks';
 import {isRenderFunc} from 'sentry/utils/isRenderFunc';
-import withConfig from 'sentry/utils/withConfig';
-import withOrganization from 'sentry/utils/withOrganization';
+import useOrganization from 'sentry/utils/useOrganization';
 import withProject from 'sentry/utils/withProject';
 
 import ComingSoon from './comingSoon';
 
-type Props = {
+type FeatureProps = {
   /**
    * If children is a function then will be treated as a render prop and
    * passed FeatureRenderProps.
@@ -18,8 +19,7 @@ type Props = {
    * The other interface is more simple, only show `children` if org/project has
    * all the required feature.
    */
-  children: React.ReactNode | ChildrenRenderFn;
-  config: Config;
+  children: React.ReactElement | ChildrenRenderFn;
   /**
    * List of required feature tags. Note we do not enforce uniqueness of tags anywhere.
    * On the backend end, feature tags have a scope prefix string that is stripped out on the
@@ -28,10 +28,6 @@ type Props = {
    * Use `organizations:` or `projects:` prefix strings to specify a feature with context.
    */
   features: string[];
-  /**
-   * The following properties will be set by the HoCs
-   */
-  organization: Organization;
   /**
    * Specify the key to use for hookstore functionality.
    *
@@ -80,119 +76,120 @@ type FeatureRenderProps = {
  * call the original children function  but override the `renderDisabled`
  * with another function/component.
  */
-type RenderDisabledProps = FeatureRenderProps & {
-  children: React.ReactNode | ChildrenRenderFn;
-  renderDisabled?: (props: FeatureRenderProps) => React.ReactNode;
-};
-
-export type RenderDisabledFn = (props: RenderDisabledProps) => React.ReactNode;
-
-type ChildRenderProps = FeatureRenderProps & {
-  renderDisabled?: undefined | boolean | RenderDisabledFn;
-};
-
-export type ChildrenRenderFn = (props: ChildRenderProps) => React.ReactNode;
-
-type AllFeatures = {
-  configFeatures: string[];
-  organization: string[];
-  project: string[];
-};
-
-/**
- * Component to handle feature flags.
- */
-class Feature extends React.Component<Props> {
-  static defaultProps = {
-    renderDisabled: false,
-    requireAll: true,
-  };
-
-  getAllFeatures(): AllFeatures {
-    const {organization, project, config} = this.props;
-
-    return {
-      configFeatures: config.features ? Array.from(config.features) : [],
-      organization: (organization && organization.features) || [],
-      project: (project && project.features) || [],
-    };
-  }
-
-  hasFeature(feature: string, features: AllFeatures) {
-    const shouldMatchOnlyProject = feature.match(/^projects:(.+)/);
-    const shouldMatchOnlyOrg = feature.match(/^organizations:(.+)/);
-
-    // Array of feature strings
-    const {configFeatures, organization, project} = features;
-
-    // Check config store first as this overrides features scoped to org or
-    // project contexts.
-    if (configFeatures.includes(feature)) {
-      return true;
-    }
-
-    if (shouldMatchOnlyProject) {
-      return project.includes(shouldMatchOnlyProject[1]);
-    }
-
-    if (shouldMatchOnlyOrg) {
-      return organization.includes(shouldMatchOnlyOrg[1]);
-    }
-
-    // default, check all feature arrays
-    return organization.includes(feature) || project.includes(feature);
-  }
-
-  render() {
-    const {
-      children,
-      features,
-      renderDisabled,
-      hookName,
-      organization,
-      project,
-      requireAll,
-    } = this.props;
-
-    const allFeatures = this.getAllFeatures();
-    const method = requireAll ? 'every' : 'some';
-    const hasFeature =
-      !features || features[method](feat => this.hasFeature(feat, allFeatures));
-
-    // Default renderDisabled to the ComingSoon component
-    let customDisabledRender =
-      renderDisabled === false
-        ? false
-        : typeof renderDisabled === 'function'
-        ? renderDisabled
-        : () => <ComingSoon />;
-
-    // Override the renderDisabled function with a hook store function if there
-    // is one registered for the feature.
-    if (hookName) {
-      const hooks = HookStore.get(hookName);
-
-      if (hooks.length > 0) {
-        customDisabledRender = hooks[0];
-      }
-    }
-    const renderProps = {
-      organization,
-      project,
-      features,
-      hasFeature,
-    };
-
-    if (!hasFeature && customDisabledRender !== false) {
-      return customDisabledRender({children, ...renderProps});
-    }
-
-    if (isRenderFunc<ChildrenRenderFn>(children)) {
-      return children({renderDisabled, ...renderProps});
-    }
-
-    return hasFeature && children ? children : null;
-  }
+export type RenderDisabledFn = (props: RenderDisabledProps) => React.ReactElement;
+interface RenderDisabledProps extends FeatureRenderProps {
+  children: React.ReactElement | ChildrenRenderFn;
+  renderDisabled?: (props: FeatureRenderProps) => React.ReactElement;
 }
 
-export default withOrganization(withProject(withConfig(Feature)));
+export type ChildrenRenderFn = (props: ChildRenderProps) => React.ReactElement;
+interface ChildRenderProps extends FeatureRenderProps {
+  renderDisabled?: undefined | boolean | RenderDisabledFn;
+}
+
+type FeaturesByEntity = {
+  configFeatures: Set<string>;
+  organization: Set<string>;
+  project: Set<string>;
+};
+
+function getFeatuesByEntity(
+  config: Config,
+  organization: Organization,
+  project: FeatureProps['project']
+): FeaturesByEntity {
+  return {
+    configFeatures: new Set(config.features ?? []),
+    organization: new Set(organization?.features ?? []),
+    project: new Set(project?.features ?? []),
+  };
+}
+
+function checkFeatureAccess(feature: string, features: FeaturesByEntity): boolean {
+  const shouldMatchOnlyProject = feature.match(/^projects:(.+)/);
+  const shouldMatchOnlyOrg = feature.match(/^organizations:(.+)/);
+
+  // Check config store first as this overrides features scoped to org or project contexts.
+  if (features.configFeatures.has(feature)) {
+    return true;
+  }
+
+  if (shouldMatchOnlyProject) {
+    return features.project.has(shouldMatchOnlyProject[1]);
+  }
+
+  if (shouldMatchOnlyOrg) {
+    return features.organization.has(shouldMatchOnlyOrg[1]);
+  }
+
+  return features.organization.has(feature) || features.project.has(feature);
+}
+
+function DefaultDisabledComponent(): React.ReactElement {
+  return <ComingSoon />;
+}
+
+function Feature(props: FeatureProps): React.ReactElement | null {
+  const organization = useOrganization();
+  const config = useLegacyStore(ConfigStore);
+
+  const featuresByEntity = useMemo(() => {
+    return getFeatuesByEntity(config, organization, props.project);
+  }, [config, organization, props.project]);
+
+  const hasFeature = useMemo(() => {
+    if (!props.features.length) {
+      return false;
+    }
+
+    if (props.requireAll ?? true) {
+      return props.features.every(feature =>
+        checkFeatureAccess(feature, featuresByEntity)
+      );
+    }
+
+    return props.features.some(feature => checkFeatureAccess(feature, featuresByEntity));
+  }, []);
+
+  // Default renderDisabled to the ComingSoon component
+  let customDisabledRender =
+    (props.renderDisabled ?? false) === false
+      ? false
+      : typeof props.renderDisabled === 'function'
+      ? props.renderDisabled
+      : DefaultDisabledComponent;
+
+  // Override the renderDisabled function with a hook store function if there
+  // is one registered for the feature.
+  if (props.hookName) {
+    const hooks = HookStore.get(props.hookName);
+
+    if (hooks.length > 0) {
+      customDisabledRender = hooks[0] as () => React.ReactElement;
+    }
+  }
+
+  if (!hasFeature && customDisabledRender) {
+    return customDisabledRender({
+      children: props.children,
+      organization,
+      project: props.project,
+      features: props.features,
+      hasFeature,
+    });
+  }
+
+  if (isRenderFunc<ChildrenRenderFn>(props.children)) {
+    return props.children({
+      renderDisabled: props.renderDisabled ?? false,
+      organization,
+      project: props.project,
+      features: props.features,
+      hasFeature,
+    });
+  }
+
+  return hasFeature ? props.children : null;
+}
+
+export default withProject(Feature);
