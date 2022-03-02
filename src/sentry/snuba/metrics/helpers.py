@@ -96,7 +96,9 @@ TS_COL_QUERY = "timestamp"
 TS_COL_GROUP = "bucketed_time"
 
 
-def parse_field(field: str) -> Tuple[str, str]:
+def parse_field(field: str) -> Tuple[Optional[str], str]:
+    if field in DERIVED_METRICS:
+        return None, field
     matches = FIELD_REGEX.match(field)
     try:
         if matches is None:
@@ -389,13 +391,22 @@ class SnubaQueryBuilder:
     ) -> List[Union[BooleanCondition, Condition]]:
         assert self._projects
         org_id = self._projects[0].organization_id
+
+        metric_ids_set = set()
+        for _, name in query_definition.fields.values():
+            # ToDo ---- add metric ids depending on the entity
+            if name not in DERIVED_METRICS:
+                metric_ids_set.add(resolve_weak(name))
+            else:
+                metric_ids_set |= DerivedMetricResolver.resolve_metric_ids(name)
+
         where: List[Union[BooleanCondition, Condition]] = [
             Condition(Column("org_id"), Op.EQ, org_id),
             Condition(Column("project_id"), Op.IN, [p.id for p in self._projects]),
             Condition(
                 Column("metric_id"),
                 Op.IN,
-                [resolve_weak(name) for _, name in query_definition.fields.values()],
+                list(metric_ids_set),
             ),
             Condition(Column(TS_COL_QUERY), Op.GTE, query_definition.start),
             Condition(Column(TS_COL_QUERY), Op.LT, query_definition.end),
@@ -426,7 +437,12 @@ class SnubaQueryBuilder:
     def _build_queries(self, query_definition):
         queries_by_entity = OrderedDict()
         for op, metric_name in query_definition.fields.values():
-            entity = OPERATIONS_TO_ENTITY[op]
+            if metric_name not in DERIVED_METRICS:
+                entity = OPERATIONS_TO_ENTITY[op]
+            else:
+                entity = DERIVED_METRICS[metric_name].entity
+                if not entity:
+                    continue
 
             if entity not in self._implemented_datasets:
                 raise NotImplementedError(f"Dataset not yet implemented: {entity}")
@@ -443,9 +459,14 @@ class SnubaQueryBuilder:
 
     @staticmethod
     def _build_select(entity, fields):
-        for op, _ in fields:
-            snuba_function = _OP_TO_SNUBA_FUNCTION[entity][op]
-            yield Function(snuba_function, [Column("value")], alias=op)
+        snql = []
+        for op, name in fields:
+            if name in DERIVED_METRICS:
+                snql += DerivedMetricResolver.resolve_select(name, entity)
+            else:
+                snuba_function = _OP_TO_SNUBA_FUNCTION[entity][op]
+                snql += [Function(snuba_function, [Column("value")], alias=op)]
+        return snql
 
     def _build_queries_for_entity(self, query_definition, entity, fields, where, groupby):
         totals_query = Query(
@@ -504,10 +525,20 @@ class SnubaResultConverter:
         self._query_definition = query_definition
         self._intervals = intervals
         self._results = results
+        self._post_op_fields = []
 
-        self._ops_by_metric = ops_by_metric = {}
+        self._metric_to_ops_aliases = {}
         for op, metric in query_definition.fields.values():
-            ops_by_metric.setdefault(metric, []).append(op)
+            if metric in DERIVED_METRICS:
+                # ToDo merge trees so we don't have to evaluate everyone
+                self._post_op_fields += \
+                    DerivedMetricResolver.generate_bottom_up_derived_metrics_dependencies(metric)
+                self._metric_to_ops_aliases.update(
+                    DerivedMetricResolver.generate_metrics_to_aliases(metric))
+            else:
+                self._metric_to_ops_aliases.setdefault(metric, []).append(op)
+
+        print("Operations by metric", self._metric_to_ops_aliases.values())
 
         self._timestamp_index = {timestamp: index for index, timestamp in enumerate(intervals)}
 
@@ -516,6 +547,9 @@ class SnubaResultConverter:
         return reverse_resolve(tag_key)
 
     def _extract_data(self, entity, data, groups):
+        print("^"*90)
+        print("Daya ", data)
+        print("^"*90)
         tags = tuple(
             (key, data[key])
             for key in sorted(data.keys())
@@ -523,7 +557,7 @@ class SnubaResultConverter:
         )
 
         metric_name = reverse_resolve(data["metric_id"])
-        ops = self._ops_by_metric[metric_name]
+        result_aliases = self._metric_to_ops_aliases[metric_name]
 
         tag_data = groups.setdefault(
             tags,
@@ -536,20 +570,32 @@ class SnubaResultConverter:
         if timestamp is not None:
             timestamp = parse_snuba_datetime(timestamp)
 
-        for op in ops:
-            key = f"{op}({metric_name})"
+        for alias in result_aliases:
+            if alias not in DERIVED_METRICS:
+                op = alias
+                key = f"{op}({metric_name})"
+            else:
+                op = None
+                key = alias
 
-            value = data[op]
-            if op in _OPERATIONS_PERCENTILES:
-                value = value[0]
+            if op:
+                value = data[op]
+                if op in _OPERATIONS_PERCENTILES:
+                    value = value[0]
+            else:
+                value = data[key]
 
             # If this is time series data, add it to the appropriate series.
             # Else, add to totals
             if timestamp is None:
                 tag_data["totals"][key] = finite_or_none(value)
             else:
+                try:
+                    empty_values = len(self._intervals) * [_DEFAULT_AGGREGATES[op]]
+                except KeyError:
+                    empty_values = len(self._intervals) * [None]
                 series = tag_data.setdefault("series", {}).setdefault(
-                    key, len(self._intervals) * [_DEFAULT_AGGREGATES[op]]
+                    key, empty_values
                 )
                 series_index = self._timestamp_index[timestamp]
                 series[series_index] = finite_or_none(value)
@@ -561,6 +607,8 @@ class SnubaResultConverter:
             totals = subresults["totals"]["data"]
             for data in totals:
                 self._extract_data(entity, data, groups)
+
+            print("Before series ", totals)
 
             if "series" in subresults:
                 series = subresults["series"]["data"]
@@ -580,4 +628,277 @@ class SnubaResultConverter:
             for tags, data in groups.items()
         ]
 
+        for group in groups:
+            totals = group["totals"]
+            for post_op_field in self._post_op_fields:
+                if post_op_field in totals:
+                    print("Skipping")
+                    continue
+                derived_metric = DERIVED_METRICS[post_op_field]
+                totals[post_op_field] = derived_metric.compute_func(
+                    totals[derived_metric.metrics[0]], totals[derived_metric.metrics[1]])
+
+        print("$" * 90)
+        print(groups)
+        print("$" * 90)
+
         return groups
+
+
+def _init_sessions(alias=None):
+    return Function(
+        "sumMergeIf",
+        [
+            Column("value"),
+            Function(
+                "equals",
+                [
+                    Function(
+                        "arrayElement",
+                        [
+                            Column("tags.value"),
+                            Function(
+                                "indexOf",
+                                [Column("tags.key"), resolve_weak("session.status")],
+                            ),
+                        ],
+                        "status",
+                    ),
+                    resolve_weak("init"),
+                ],
+            ),
+        ],
+        alias or "init_sessions"
+    )
+
+
+def _crashed_sessions(alias=None):
+    return Function(
+        "sumMergeIf",
+        [
+            Column("value"),
+            Function(
+                "equals",
+                [
+                    Function(
+                        "arrayElement",
+                        [
+                            Column("tags.value"),
+                            Function(
+                                "indexOf",
+                                [Column("tags.key"), resolve_weak("session.status")],
+                            ),
+                        ],
+                        "status",
+                    ),
+                    resolve_weak("crashed"),
+                ],
+            ),
+        ],
+        alias or "crashed_sessions"
+    )
+
+
+def _errored_preaggr_sessions(alias=None):
+    return Function(
+        "sumMergeIf",
+        [
+            Column("value"),
+            Function(
+                "equals",
+                [
+                    Function(
+                        "arrayElement",
+                        [
+                            Column("tags.value"),
+                            Function(
+                                "indexOf",
+                                [Column("tags.key"), resolve_weak("session.status")],
+                            ),
+                        ],
+                        "status",
+                    ),
+                    resolve_weak("errored_preaggr"),
+                ],
+            ),
+        ],
+        alias or "errored_preaggr"
+    )
+
+
+def _sessions_errored_set(alias=None):
+    return Function(
+        "uniqCombined64Merge",
+        [
+            Column("value"),
+        ],
+        alias or "sessions_errored_set"
+    )
+
+
+def _percentage(arg1, arg2, entity, alias=None):
+    # ToDo: Handle the case where they don't belong to the same entity or need to be computed
+    #  separately
+    arg1_snql = arg1
+    if arg1 in DERIVED_METRICS:
+        derived_metric_1 = DERIVED_METRICS[arg1]
+        if len(entity) == 1 and derived_metric_1.result_type == entity[0]:
+            arg1_snql = derived_metric_1.snql(entity=entity)
+
+    arg2_snql = arg2
+    if arg2 in DERIVED_METRICS:
+        derived_metric_2 = DERIVED_METRICS[arg2]
+        if len(entity) == 1 and derived_metric_2.result_type == entity[0]:
+            arg2_snql = derived_metric_2.snql(entity=entity)
+
+    # Sanity Check
+    for arg_snql in [arg1_snql, arg2_snql]:
+        if isinstance(arg_snql, str) and arg_snql in DERIVED_METRICS:
+            raise Exception("Something went wrong!")
+
+    return Function(
+        "multiply",
+        [
+            100,
+            Function("minus", [1, Function("divide", [arg1_snql, arg2_snql])]),
+        ],
+        alias or "percentage"
+    )
+
+
+def _sum(arg1, arg2):
+    return arg1 + arg2
+
+
+class DerivedMetric:
+    def __init__(
+        self,
+        name: str,
+        metrics: List[str],
+        entity: Optional[str],
+        result_type: Optional[str] = None,
+        snql: Optional[Function] = None,
+        compute_func: Any = lambda *args: args,
+        is_private: bool = False,
+    ):
+        self.name = name
+        self.metrics = metrics
+        self.snql = snql
+        self.entity = entity
+        self.result_type = result_type
+        self.compute_func = compute_func
+
+
+DERIVED_METRICS = {
+    derived_metric.name: derived_metric
+    for derived_metric in [
+        # ToDo do this for
+        # - users_crash_free_percentage
+        # - errored_sessions
+        # - sessions grouped by status
+        # ToDo: Make sure conditions are not duplicated and are combined
+        DerivedMetric(
+            name="init_sessions",
+            metrics=["sentry.sessions.session"],
+            entity="metrics_counters",
+            result_type="metrics_counters",
+            snql=lambda *_, entity, alias=None: _init_sessions(alias),
+            is_private=True,
+        ),
+        DerivedMetric(
+            name="crashed_sessions",
+            metrics=["sentry.sessions.session"],
+            entity="metrics_counters",
+            result_type="metrics_counters",
+            snql=lambda *_, entity, alias=None: _crashed_sessions(alias=alias),
+            is_private=True,
+        ),
+        DerivedMetric(
+            name="crash_free_percentage",
+            metrics=["crashed_sessions", "init_sessions"],
+            entity="metrics_counters",
+            snql=lambda *args, entity, alias=None: _percentage(*args, entity, alias),
+        ),
+        DerivedMetric(
+            name="errored_preaggr",
+            metrics=["sentry.sessions.session"],
+            entity="metrics_counters",
+            snql=lambda *_, entity, alias=None: _errored_preaggr_sessions(alias=alias)
+        ),
+        DerivedMetric(
+            name="sessions_errored_set",
+            metrics=["sentry.sessions.session.error"],
+            entity="metrics_sets",
+            snql=lambda *_, entity, alias=None: _sessions_errored_set(alias=alias)
+        ),
+        DerivedMetric(
+            name="errored_sessions",
+            metrics=["errored_preaggr", "sessions_errored_set"],
+            entity=None,
+            snql=None,
+            compute_func=lambda *args: _sum(*args)
+        )
+    ]
+}
+
+
+class DerivedMetricResolver:
+
+    @staticmethod
+    def resolve_metric_ids(derived_metric_name):
+        # BFS
+        # ToDo: look into current id
+        ids = set()
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        for metric_name in derived_metric.metrics:
+            if metric_name in DERIVED_METRICS:
+                ids |= DerivedMetricResolver.resolve_metric_ids(metric_name)
+            else:
+                ids.add(resolve_weak(metric_name))
+        return ids
+
+    @staticmethod
+    def resolve_select(derived_metric_name, entity):
+        # DFS
+        if derived_metric_name not in DERIVED_METRICS:
+            return []
+        snql = []
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        if entity == derived_metric.entity and derived_metric.snql is not None:
+            snql += [derived_metric.snql(entity="none")]
+        for metric_name in derived_metric.metrics:
+            snql += DerivedMetricResolver.resolve_select(metric_name, entity)
+        return snql
+
+    @staticmethod
+    def generate_metrics_to_aliases(derived_metric_name):
+        # BFS
+        if derived_metric_name not in DERIVED_METRICS:
+            return {}
+        metrics_to_aliases = {}
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        for metric in derived_metric.metrics:
+            if metric not in DERIVED_METRICS:
+                if metric not in metrics_to_aliases:
+                    metrics_to_aliases[metric] = [derived_metric_name]
+                else:
+                    metrics_to_aliases[metric] += [derived_metric_name]
+        for metric in derived_metric.metrics:
+            metrics_to_aliases.update(DerivedMetricResolver.generate_metrics_to_aliases(metric))
+        return metrics_to_aliases
+
+    @staticmethod
+    def generate_bottom_up_derived_metrics_dependencies(derived_metric_name):
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        import queue
+        results = []
+        queue = queue.Queue()
+        queue.put(derived_metric)
+        while not queue.empty():
+            node = queue.get()
+            if node.name in DERIVED_METRICS:
+                results.append(node.name)
+            for metric in node.metrics:
+                if metric in DERIVED_METRICS:
+                    queue.put(DERIVED_METRICS[metric])
+        return list(reversed(results))
