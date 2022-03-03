@@ -18,16 +18,10 @@ function MetricsSwitch({onSwitch}: {onSwitch: () => void}) {
   const organization = useOrganization();
   const {isMetricsData, setIsMetricsData} = useMetricsSwitch();
 
-  function handleToggle() {
-    onSwitch();
-    setIsMetricsData(!isMetricsData);
-  }
-
   return (
     <Feature features={[FEATURE_FLAG]} organization={organization}>
       <Label>
-        {t('Metrics Data')}
-        <Switch isActive={isMetricsData} toggle={handleToggle} size="lg" />
+        {/* <Switch isActive={isMetricsData} toggle={handleToggle} size="lg" /> */}
       </Label>
     </Feature>
   );
