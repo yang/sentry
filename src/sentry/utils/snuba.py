@@ -773,6 +773,9 @@ def _bulk_snuba_query(
 ) -> ResultSet:
     query_referrer = headers.get("referer", "<unknown>")
 
+    print("2" * 90)
+    print(snuba_param_list)
+
     with sentry_sdk.start_span(
         op="snuba_query",
         description=query_referrer,
@@ -825,6 +828,7 @@ def _bulk_snuba_query(
     for response, _, reverse in query_results:
         try:
             body = json.loads(response.data)
+            print("Query Resultssss ", body)
             if SNUBA_INFO:
                 if "sql" in body:
                     logger.info(
