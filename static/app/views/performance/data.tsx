@@ -382,6 +382,13 @@ export function getTermHelp(
   return PERFORMANCE_TERMS[term](organization);
 }
 
+function shouldAddDefaultConditions(location: Location) {
+  const {query} = location;
+  const searchQuery = decodeScalar(query.query, '');
+  const isDefaultQuery = decodeScalar(query.isDefaultQuery);
+  return !searchQuery && isDefaultQuery !== 'false';
+}
+
 function generateGenericPerformanceEventView(
   location: Location,
   isMetricsData: boolean
@@ -423,6 +430,11 @@ function generateGenericPerformanceEventView(
 
   const searchQuery = decodeScalar(query.query, '');
   const conditions = new MutableSearch(searchQuery);
+
+  // This is not an override condition since we want the duration to appear in the search bar as a default.
+  if (shouldAddDefaultConditions(location) && !isMetricsData) {
+    conditions.setFilterValues('transaction.duration', ['<15m']);
+  }
 
   // If there is a bare text search, we want to treat it as a search
   // on the transaction name.
@@ -499,6 +511,12 @@ function generateBackendPerformanceEventView(
 
   const searchQuery = decodeScalar(query.query, '');
   const conditions = new MutableSearch(searchQuery);
+
+  // This is not an override condition since we want the duration to appear in the search bar as a default.
+  if (shouldAddDefaultConditions(location) && !isMetricsData) {
+    conditions.setFilterValues('transaction.duration', ['<15m']);
+  }
+
   // If there is a bare text search, we want to treat it as a search
   // on the transaction name.
   if (conditions.freeText.length > 0) {
@@ -585,6 +603,11 @@ function generateMobilePerformanceEventView(
   const searchQuery = decodeScalar(query.query, '');
   const conditions = new MutableSearch(searchQuery);
 
+  // This is not an override condition since we want the duration to appear in the search bar as a default.
+  if (shouldAddDefaultConditions(location) && !isMetricsData) {
+    conditions.setFilterValues('transaction.duration', ['<15m']);
+  }
+
   // If there is a bare text search, we want to treat it as a search
   // on the transaction name.
   if (conditions.freeText.length > 0) {
@@ -650,6 +673,11 @@ function generateFrontendPageloadPerformanceEventView(
 
   const searchQuery = decodeScalar(query.query, '');
   const conditions = new MutableSearch(searchQuery);
+
+  // This is not an override condition since we want the duration to appear in the search bar as a default.
+  if (shouldAddDefaultConditions(location) && !isMetricsData) {
+    conditions.setFilterValues('transaction.duration', ['<15m']);
+  }
 
   // If there is a bare text search, we want to treat it as a search
   // on the transaction name.
@@ -717,6 +745,11 @@ function generateFrontendOtherPerformanceEventView(
 
   const searchQuery = decodeScalar(query.query, '');
   const conditions = new MutableSearch(searchQuery);
+
+  // This is not an override condition since we want the duration to appear in the search bar as a default.
+  if (shouldAddDefaultConditions(location) && !isMetricsData) {
+    conditions.setFilterValues('transaction.duration', ['<15m']);
+  }
 
   // If there is a bare text search, we want to treat it as a search
   // on the transaction name.
