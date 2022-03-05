@@ -29,6 +29,8 @@ __all__ = (
 import math
 import re
 from collections import OrderedDict
+from functools import cached_property
+from operator import itemgetter
 from datetime import datetime, timedelta
 from typing import (
     Any,
@@ -53,6 +55,7 @@ from sentry.api.utils import InvalidParams, get_date_range_from_params
 from sentry.exceptions import InvalidSearchQuery
 from sentry.models import Project
 from sentry.search.events.builder import UnresolvedQuery
+from sentry.sentry_metrics import indexer
 from sentry.sentry_metrics.utils import (
     resolve_tag_key,
     resolve_weak,
@@ -67,7 +70,7 @@ from sentry.snuba.sessions_v2 import (  # TODO: unite metrics and sessions_v2
     finite_or_none,
 )
 from sentry.utils.dates import parse_stats_period, to_datetime, to_timestamp
-from sentry.utils.snuba import parse_snuba_datetime
+from sentry.utils.snuba import parse_snuba_datetime, raw_snql_query
 
 FIELD_REGEX = re.compile(r"^(\w+)\(((\w|\.|_)+)\)$")
 TAG_REGEX = re.compile(r"^(\w|\.|_)+$")
@@ -412,7 +415,8 @@ class SnubaQueryBuilder:
             if name not in DERIVED_METRICS:
                 metric_ids_set.add(resolve_weak(name))
             else:
-                metric_ids_set |= DerivedMetricResolver.gen_metric_ids(name, entity=entity)
+                derived_metric = DERIVED_METRICS[name]
+                metric_ids_set |= derived_metric.generate_metric_ids()
         entity_specific_where += [
             Condition(
                 Column("metric_id"),
@@ -445,7 +449,7 @@ class SnubaQueryBuilder:
             if metric_name not in DERIVED_METRICS:
                 entity = OPERATIONS_TO_ENTITY[op]
             else:
-                entity = DERIVED_METRICS[metric_name].entity
+                entity = DERIVED_METRICS[metric_name].get_entity(self._projects)
                 if not entity:
                     continue
 
@@ -467,7 +471,8 @@ class SnubaQueryBuilder:
         snql = []
         for op, name in fields:
             if name in DERIVED_METRICS:
-                snql += DerivedMetricResolver.gen_select_snql(name, entity)
+                derived_metric = DERIVED_METRICS[name]
+                snql += derived_metric.generate_select_statements()
             else:
                 snuba_function = _OP_TO_SNUBA_FUNCTION[entity][op]
                 snql += [
@@ -475,17 +480,12 @@ class SnubaQueryBuilder:
                         snuba_function,
                         [
                             Column("value"),
-                            Function(
-                                "equals",
-                                [
-                                    Column("metric_id"),
-                                    resolve_weak(name)
-                                ]
-                            )
+                            Function("equals", [Column("metric_id"), resolve_weak(name)]),
                         ],
-                        alias=f"{op}__{name}"
+                        alias=f"{op}__{name}",
                     )
                 ]
+        print("SNQLLL ", snql)
         return snql
 
     def _build_queries_for_entity(self, query_definition, entity, fields, where, groupby):
@@ -532,10 +532,7 @@ _DEFAULT_AGGREGATES = {
 }
 
 # ToDo add here
-_UNIT_TO_TYPE = {
-    "sessions": "count",
-    "percentage": "percentage"
-}
+_UNIT_TO_TYPE = {"sessions": "count", "percentage": "percentage"}
 
 
 def combine_dictionary_of_list_values(main_dict, other_dict):
@@ -567,9 +564,8 @@ class SnubaResultConverter:
         for op, metric in query_definition.fields.values():
             if metric in DERIVED_METRICS:
                 # ToDo merge trees so we don't have to evaluate everyone
-                self._post_op_fields += (
-                    DerivedMetricResolver.generate_bottom_up_derived_metrics_dependencies(metric)
-                )
+                derived_metric = DERIVED_METRICS[metric]
+                self._post_op_fields += derived_metric.generate_metrics_dependency_tree()
 
         self._timestamp_index = {timestamp: index for index, timestamp in enumerate(intervals)}
 
@@ -586,10 +582,7 @@ class SnubaResultConverter:
 
         tag_data = groups.setdefault(
             tags,
-            {
-                "totals": {},
-                "series": {}
-            },
+            {"totals": {}, "series": {}},
         )
 
         timestamp = data.pop(TS_COL_GROUP, None)
@@ -613,8 +606,7 @@ class SnubaResultConverter:
                 continue
 
             if metric_name in DERIVED_METRICS:
-                default_zero = \
-                    _DEFAULT_AGGREGATES[_UNIT_TO_TYPE[DERIVED_METRICS[metric_name].unit]]
+                default_zero = _DEFAULT_AGGREGATES[_UNIT_TO_TYPE[DERIVED_METRICS[metric_name].unit]]
             else:
                 default_zero = _DEFAULT_AGGREGATES[op]
 
@@ -654,7 +646,7 @@ class SnubaResultConverter:
                 series = subresults["series"]["data"]
                 for data in series:
                     self._extract_data(entity, data, groups)
-        print(" data is ", groups)
+        print("data is ", groups)
 
         groups = [
             dict(
@@ -669,18 +661,10 @@ class SnubaResultConverter:
             for tags, data in groups.items()
         ]
 
-        print(self._post_op_fields)
-        print("Groupsss ", groups)
-        # ToDo check what happens if there is a groupBy
-        # if len(groups) == 1 and not groups[0].get("totals", {}):
-        #     groups = []
-
         for group in groups:
             totals = group["totals"]
 
             for post_op_field in self._post_op_fields:
-                print("Trying ", post_op_field)
-                print(totals)
                 if post_op_field in totals:
                     print("Skipping ", post_op_field)
                     continue
@@ -692,11 +676,77 @@ class SnubaResultConverter:
                 if compute_func_args:
                     totals[post_op_field] = derived_metric.compute_func(*compute_func_args)
 
-        print("$" * 90)
-        print(groups)
-        print("$" * 90)
-
         return groups
+
+
+_GRANULARITY = 24 * 60 * 60
+
+
+def _get_data(
+    *,
+    entity_key: EntityKey,
+    select: List[Column],
+    where: List[Condition],
+    groupby: List[Column],
+    projects,
+    org_id,
+    referrer: str,
+) -> Mapping[str, Any]:
+    # Round timestamp to minute to get cache efficiency:
+    now = datetime.now().replace(second=0, microsecond=0)
+
+    query = Query(
+        dataset=Dataset.Metrics.value,
+        match=Entity(entity_key.value),
+        select=select,
+        groupby=groupby,
+        where=[
+            Condition(Column("org_id"), Op.EQ, org_id),
+            Condition(Column("project_id"), Op.IN, [p.id for p in projects]),
+            Condition(Column(TS_COL_QUERY), Op.GTE, now - timedelta(hours=24)),
+            Condition(Column(TS_COL_QUERY), Op.LT, now),
+        ]
+        + where,
+        granularity=Granularity(_GRANULARITY),
+    )
+    result = raw_snql_query(query, referrer, use_cache=True)
+    return result["data"]
+
+
+def _get_single_metric_info(projects: Sequence[Project], metric_name: str) -> MetricMetaWithTagKeys:
+    assert projects
+
+    metric_id = indexer.resolve(metric_name)
+
+    if metric_id is None:
+        raise InvalidParams
+
+    for metric_type in ("counter", "set", "distribution"):
+        # TODO: What if metric_id exists for multiple types / units?
+        entity_key = METRIC_TYPE_TO_ENTITY[metric_type]
+        data = _get_data(
+            entity_key=entity_key,
+            select=[Column("metric_id"), Column("tags.key")],
+            where=[Condition(Column("metric_id"), Op.EQ, metric_id)],
+            groupby=[Column("metric_id"), Column("tags.key")],
+            referrer="snuba.metrics.meta.get_single_metric",
+            projects=projects,
+            org_id=projects[0].organization_id,
+        )
+        if data:
+            tag_ids = {tag_id for row in data for tag_id in row["tags.key"]}
+            return {
+                "name": metric_name,
+                "type": metric_type,
+                "operations": AVAILABLE_OPERATIONS[entity_key.value],
+                "tags": sorted(
+                    ({"key": reverse_resolve(tag_id)} for tag_id in tag_ids),
+                    key=itemgetter("key"),
+                ),
+                "unit": None,
+            }
+
+    raise InvalidParams
 
 
 def _init_sessions(metric_id, alias=None):
@@ -778,17 +828,9 @@ def _errored_preaggr_sessions(metric_ids, alias=None):
                             resolve_weak("errored_preaggr"),
                         ],
                     ),
-                    Function(
-                        "in",
-                        [
-                            Column("metric_id"),
-                            list(metric_ids)
-                        ]
-                    )
-
-                ]
-            )
-
+                    Function("in", [Column("metric_id"), list(metric_ids)]),
+                ],
+            ),
         ],
         alias or "errored_preaggr",
     )
@@ -815,17 +857,16 @@ def _percentage_in_snql(arg1, arg2, entity, metric_ids, alias=None):
     arg1_snql = arg1
     if arg1 in DERIVED_METRICS:
         derived_metric_1 = DERIVED_METRICS[arg1]
-        if derived_metric_1.result_type == entity:
+        if derived_metric_1.entity == entity:
             arg1_snql = derived_metric_1.snql(metric_ids=metric_ids, entity=entity)
 
     arg2_snql = arg2
     if arg2 in DERIVED_METRICS:
         derived_metric_2 = DERIVED_METRICS[arg2]
-        if derived_metric_2.result_type == entity:
+        if derived_metric_2.entity == entity:
             arg2_snql = derived_metric_2.snql(metric_ids=metric_ids, entity=entity)
 
     # Sanity Check
-    print(arg1_snql, arg2_snql)
     for arg_snql in [arg1_snql, arg2_snql]:
         if isinstance(arg_snql, str) and arg_snql in DERIVED_METRICS:
             raise Exception("Something went wrong!")
@@ -840,185 +881,22 @@ def _percentage_in_snql(arg1, arg2, entity, metric_ids, alias=None):
     )
 
 
-class DerivedMetric:
-    def __init__(
-        self,
-        name: str,
-        metrics: List[str],
-        unit: str,
-        entity: Optional[str],
-        result_type: Optional[str] = None,
-        snql: Optional[Function] = None,
-        compute_func: Any = lambda *args: args,
-        is_private: bool = False,
-    ):
-        self.name = name
-        self.metrics = metrics
-        self.snql = snql
-        self.entity = entity
-        self.result_type = result_type
-        self.compute_func = compute_func
-        self.unit = unit
-
-
-class SingularEntityDerivedMetric(DerivedMetric):
-    ...
-
-
-class CompositeEntityDerivedMetric(DerivedMetric):
-    ...
-
-
-DERIVED_METRICS = {
-    derived_metric.name: derived_metric
-    for derived_metric in [
-        DerivedMetric(
-            # sum(sentry.sessions.session{status:crashed})
-            name="init_sessions",
-            metrics=["sentry.sessions.session"],
-            entity="metrics_counters",
-            unit="sessions",
-            result_type="numeric",
-            snql=lambda *_, entity, metric_ids, alias=None: _init_sessions(metric_ids, alias),
-            is_private=True,
-        ),
-        DerivedMetric(
-            # sum(sentry.sessions.session{status:crashed})
-            name="crashed_sessions",
-            metrics=["sentry.sessions.session"],
-            entity="metrics_counters",
-            unit="sessions",
-            result_type="numeric",
-            snql=lambda *_, entity, metric_ids, alias=None: _crashed_sessions(
-                metric_ids, alias=alias),
-            is_private=True,
-        ),
-        DerivedMetric(
-            # sum(sentry.sessions.session{status:crashed})/sum(sentry.sessions.session{status:init})
-            name="crash_free_percentage",
-            metrics=["crashed_sessions", "init_sessions"],
-            entity="metrics_counters",
-            result_type="numeric",
-            unit="percentage",
-            snql=lambda *args, entity, metric_ids, alias=None: _percentage_in_snql(
-                *args, entity, metric_ids, alias="crash_free_percentage"
-            ),
-        ),
-        DerivedMetric(
-            name="errored_preaggr",
-            metrics=["sentry.sessions.session"],
-            entity="metrics_counters",
-            result_type="numeric",
-            unit="sessions",
-            snql=lambda *_, entity, metric_ids, alias=None: _errored_preaggr_sessions(
-                metric_ids, alias=alias),
-        ),
-        DerivedMetric(
-            name="sessions_errored_set",
-            metrics=["sentry.sessions.session.error"],
-            entity="metrics_sets",
-            result_type="numeric",
-            unit="sessions",
-            snql=lambda *_, entity, metric_ids, alias=None: _sessions_errored_set(
-                metric_ids, alias=alias),
-        ),
-        DerivedMetric(
-            name="errored_sessions",
-            metrics=["errored_preaggr", "sessions_errored_set"],
-            entity=None,
-            snql=None,
-            result_type="numeric",
-            unit="sessions",
-            compute_func=lambda *args: sum([*args]),
-        ),
-    ]
-}
-
-
-class DerivedMetricResolver:
+class DerivedMetricBaseTraverser:
     @staticmethod
-    def gen_metric_ids(derived_metric_name, entity):
-        if derived_metric_name not in DERIVED_METRICS:
-            return set()
-        derived_metric = DERIVED_METRICS[derived_metric_name]
-        # Stop recursing if we get to a derived metric with a different entity type than the one
-        # we started with
-        if derived_metric.entity is not None and derived_metric.entity != entity:
-            return set()
-        ids = set()
-        for metric_name in derived_metric.metrics:
-            if metric_name not in DERIVED_METRICS:
-                ids.add(resolve_weak(metric_name))
-            else:
-                ids |= DerivedMetricResolver.gen_metric_ids(metric_name, entity)
-        return ids
+    def get_entity_of_derived_metric(derived_metric_name, projects):
+        raise NotImplementedError()
 
     @staticmethod
     def gen_select_snql(derived_metric_name, entity):
-        if derived_metric_name not in DERIVED_METRICS:
-            return []
-        derived_metric = DERIVED_METRICS[derived_metric_name]
-        # Stop recursing if we get to a derived metric with a different entity type than the one
-        # we started with
-        if derived_metric.entity is not None and derived_metric.entity != entity:
-            return []
-        snql = []
-        if derived_metric.snql is not None:
-            snql += [
-                derived_metric.snql(
-                    *derived_metric.metrics,
-                    metric_ids=DerivedMetricResolver.gen_metric_ids(derived_metric_name, entity),
-                    entity=entity
-                )
-            ]
-        for metric_name in derived_metric.metrics:
-            snql += DerivedMetricResolver.gen_select_snql(metric_name, entity)
-        return snql
+        raise NotImplementedError()
 
     @staticmethod
-    def gen_metric_names_to_aliases_mapping(derived_metric_name):
-        # Function that builds a mapping from the tree on the left to a dictionary described on
-        # the right
-        #         A
-        #       /   \
-        #      /     \
-        #     B       C                  => {"raw_metric1": [B, C], "raw_metric2": [C]}
-        #      \     / \
-        #       \   /  raw_metric2
-        #   raw_metric1
-        #
-        # This is necessary because since we coalesce all select statements of a particular
-        # entity in just one query, we need to keep track of which raw_metrics correspond to
-        # which aliases returned
-        # As a hypothetical example, lets say we were querying for crash_free_percentage (which
-        # uses `sentry.sessions.session` of metric_id=14) and the total count of another metric
-        # `sentry.random.metric` of metric_id=1. Both of these metrics lie in
-        # `metrics_counters`, and so coalescing these into one query would yield an output that
-        # looks like this
-        # ┌─metric_id─┬─crash_free_percentage─┬─random_metric_sum─┐
-        # │         1 │                   nan │                 2 │
-        # │        14 │                    50 │                12 │
-        # └───────────┴───────────────────────┴───────────────────┘
-        # Now because of how the query will be structured with conditional aggregates, we get cols
-        # that might not be relevant for specific metric ids. In this case with metric_id=1 (
-        # `sentry.random.metric`), we only care about `random_metric_sum` column but the
-        # `crash_free_percentage` here is irrelevant. With metric id=14 (
-        # `sentry.sessions.session`) we are only concerned with `crash_free_percentage` while
-        # the `random_metric_sum` is irrelevant. Hence we need a way to keep track of this,
-        # and so this function generates a mapping that looks like {"sentry.random.metric": [
-        # "random_metric_name"], "sentry.sessions.session": ["crash_free_percentage"]}
-        # ToDo: Write the one one caveat here about crash_free_percentage
-        if derived_metric_name not in DERIVED_METRICS:
-            return {}
-        metric_names_to_aliases = {}
-        derived_metric = DERIVED_METRICS[derived_metric_name]
-        for metric in derived_metric.metrics:
-            if metric not in DERIVED_METRICS:
-                metric_names_to_aliases.setdefault(metric, []).append(derived_metric_name)
-            metric_names_to_aliases.update(
-                DerivedMetricResolver.gen_metric_names_to_aliases_mapping(metric)
-            )
-        return metric_names_to_aliases
+    def gen_metric_ids(derived_metric_name):
+        raise NotImplementedError()
+
+    @staticmethod
+    def validate_derived_metric_dependency_tree(derived_metric_name):
+        raise NotImplementedError()
 
     @staticmethod
     def generate_bottom_up_derived_metrics_dependencies(derived_metric_name):
@@ -1036,3 +914,236 @@ class DerivedMetricResolver:
                 if metric in DERIVED_METRICS:
                     queue.put(DERIVED_METRICS[metric])
         return list(reversed(results))
+
+
+class SingularEntityTraverser(DerivedMetricBaseTraverser):
+    @staticmethod
+    def get_entity_of_derived_metric(derived_metric_name, projects):
+        if derived_metric_name not in DERIVED_METRICS:
+            metric_type = _get_single_metric_info(projects, derived_metric_name)["type"]
+            return METRIC_TYPE_TO_ENTITY[metric_type].value
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        for metric in derived_metric.metrics:
+            return SingularEntityTraverser.get_entity_of_derived_metric(metric, projects)
+
+    @staticmethod
+    def gen_select_snql(derived_metric_name, entity):
+        if derived_metric_name not in DERIVED_METRICS:
+            return []
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        snql = [
+            derived_metric.snql(
+                *derived_metric.metrics,
+                metric_ids=SingularEntityTraverser.gen_metric_ids(derived_metric_name),
+                entity=entity,
+            )
+        ]
+        for metric_name in derived_metric.metrics:
+            snql += SingularEntityTraverser.gen_select_snql(metric_name, entity)
+        return snql
+
+    @staticmethod
+    def gen_metric_ids(derived_metric_name):
+        if derived_metric_name not in DERIVED_METRICS:
+            return set()
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        ids = set()
+        for metric_name in derived_metric.metrics:
+            if metric_name not in DERIVED_METRICS:
+                ids.add(resolve_weak(metric_name))
+            else:
+                ids |= SingularEntityTraverser.gen_metric_ids(metric_name)
+        return ids
+
+    @staticmethod
+    def validate_derived_metric_dependency_tree(derived_metric_name):
+        entities = SingularEntityTraverser.__get_all_entities_in_derived_metric_dependency_tree(
+            derived_metric_name=derived_metric_name)
+        print(derived_metric_name)
+        print(entities)
+        return len(entities) == 1
+
+    @staticmethod
+    def __get_all_entities_in_derived_metric_dependency_tree(derived_metric_name):
+        if derived_metric_name not in DERIVED_METRICS:
+            return set()
+        derived_metric = DERIVED_METRICS[derived_metric_name]
+        entities = {derived_metric.entity}
+        for metric_name in derived_metric.metrics:
+            entities |= SingularEntityTraverser.__get_all_entities_in_derived_metric_dependency_tree(metric_name)
+        return entities
+
+class CompositeEntityTraverser(DerivedMetricBaseTraverser):
+    @staticmethod
+    def get_entity_of_derived_metric(derived_metric_name, projects):
+        return None
+
+    @staticmethod
+    def gen_select_snql(derived_metric_name, entity):
+        return []
+
+    @staticmethod
+    def gen_metric_ids(derived_metric_name):
+        return set()
+
+    @staticmethod
+    def validate_derived_metric_dependency_tree(derived_metric_name):
+        return True
+
+
+class DerivedMetric:
+    def __init__(
+        self,
+        name: str,
+        metrics: List[str],
+        unit: str,
+        result_type: Optional[str] = None,
+        snql: Optional[Function] = None,
+        compute_func: Any = lambda *args: args,
+        is_private: bool = False,
+    ):
+        self.name = name
+        self.metrics = metrics
+        self.snql = snql
+        self.result_type = result_type
+        self.compute_func = compute_func
+        self.unit = unit
+        self.traverser = self._get_traverser()
+        self._entity = None
+
+    def _get_traverser(self):
+        if isinstance(self, SingularEntityDerivedMetric):
+            return SingularEntityTraverser
+        elif isinstance(self, CompositeEntityDerivedMetric):
+            return CompositeEntityTraverser
+        else:
+            raise NotImplementedError()
+
+    def get_entity(self, projects=None):
+        return (
+            self.traverser.get_entity_of_derived_metric(self.name, projects)
+            if projects
+            else self._entity
+        )
+
+    def generate_select_statements(self):
+        # st = self.traverser.validate_derived_metric_dependency_tree(derived_metric_name=self.name)
+        # print(st)
+        # if not st:
+        #     raise Exception("Incorrect Setup")
+        return self.traverser.gen_select_snql(derived_metric_name=self.name, entity=self.entity)
+
+    def generate_metric_ids(self):
+        return self.traverser.gen_metric_ids(derived_metric_name=self.name)
+
+    def generate_metrics_dependency_tree(self):
+        return self.traverser.generate_bottom_up_derived_metrics_dependencies(
+            derived_metric_name=self.name
+        )
+
+    entity = cached_property(get_entity)
+
+
+class SingularEntityDerivedMetric(DerivedMetric):
+    def __init__(
+        self,
+        name: str,
+        metrics: List[str],
+        unit: str,
+        snql: Function,
+        is_private: bool = False,
+    ):
+        super().__init__(
+            name=name,
+            metrics=metrics,
+            unit=unit,
+            result_type="numeric",
+            snql=snql,
+            compute_func=lambda *args: args,
+            is_private=is_private,
+        )
+
+    def get_entity(self, projects=None):
+        entity = super().get_entity(projects)
+        if not entity:
+            raise Exception()
+        return entity
+
+
+class CompositeEntityDerivedMetric(DerivedMetric):
+    def __init__(
+        self,
+        name: str,
+        metrics: List[str],
+        unit: str,
+        compute_func: Any = lambda *args: args,
+        is_private: bool = False,
+    ):
+        super().__init__(
+            name=name,
+            metrics=metrics,
+            unit=unit,
+            result_type="numeric",
+            snql=None,
+            compute_func=compute_func,
+            is_private=is_private,
+        )
+
+
+DERIVED_METRICS = {
+    derived_metric.name: derived_metric
+    for derived_metric in [
+        SingularEntityDerivedMetric(
+            name="init_sessions",
+            metrics=["sentry.sessions.session"],
+            unit="sessions",
+            snql=lambda *_, entity, metric_ids, alias=None: _init_sessions(metric_ids, alias),
+        ),
+        SingularEntityDerivedMetric(
+            name="crashed_sessions",
+            metrics=["sentry.sessions.session"],
+            unit="sessions",
+            snql=lambda *_, entity, metric_ids, alias=None: _crashed_sessions(
+                metric_ids, alias=alias
+            ),
+        ),
+        SingularEntityDerivedMetric(
+            name="crash_free_percentage",
+            metrics=["crashed_sessions", "init_sessions"],
+            unit="percentage",
+            snql=lambda *args, entity, metric_ids, alias=None: _percentage_in_snql(
+                *args, entity, metric_ids, alias="crash_free_percentage"
+            ),
+        ),
+        SingularEntityDerivedMetric(
+            name="crash_free_fake",
+            metrics=["crashed_sessions", "sessions_errored_set"],
+            unit="percentage",
+            snql=lambda *args, entity, metric_ids, alias=None: _percentage_in_snql(
+                *args, entity, metric_ids, alias="crash_free_fake"
+            ),
+        ),
+        SingularEntityDerivedMetric(
+            name="errored_preaggr",
+            metrics=["sentry.sessions.session"],
+            unit="sessions",
+            snql=lambda *_, entity, metric_ids, alias=None: _errored_preaggr_sessions(
+                metric_ids, alias=alias
+            ),
+        ),
+        SingularEntityDerivedMetric(
+            name="sessions_errored_set",
+            metrics=["sentry.sessions.session.error"],
+            unit="sessions",
+            snql=lambda *_, entity, metric_ids, alias=None: _sessions_errored_set(
+                metric_ids, alias=alias
+            ),
+        ),
+        CompositeEntityDerivedMetric(
+            name="errored_sessions",
+            metrics=["errored_preaggr", "sessions_errored_set"],
+            unit="sessions",
+            compute_func=lambda *args: sum([*args]),
+        ),
+    ]
+}
