@@ -1,6 +1,7 @@
 import time
 from typing import Optional
 from unittest import mock
+import copy
 
 from django.urls import reverse
 
@@ -8,6 +9,8 @@ from sentry.models import ApiToken
 from sentry.release_health.metrics import MetricsReleaseHealthBackend
 from sentry.sentry_metrics import indexer
 from sentry.sentry_metrics.sessions import SessionMetricKey
+from sentry.snuba.metrics.helpers import DERIVED_METRICS, SingularEntityDerivedMetric, \
+    _percentage_in_snql
 from sentry.testutils import APITestCase
 from sentry.testutils.cases import SessionMetricsTestCase
 from sentry.testutils.helpers import with_feature
@@ -1111,13 +1114,13 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             interval="1h",
             query="release:123",  # Unknown tag value is fine.
         )
-        print("okayyy ", response.json())
         groups = response.data["groups"]
         assert len(groups) == 0
 
 
 class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
     endpoint = "sentry-api-0-organization-metrics-data"
+    ORIGINAL_DERIVED_METRICS = copy.deepcopy(DERIVED_METRICS)
 
     def setUp(self):
         super().setUp()
@@ -1126,6 +1129,42 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
     @with_feature(FEATURE_FLAG)
     def test_percentage_fn_with_different_entity_args(self):
         raise NotImplementedError()
+
+    @with_feature(FEATURE_FLAG)
+    @mock.patch(
+        "sentry.snuba.metrics.helpers.DERIVED_METRICS",
+        {
+            **ORIGINAL_DERIVED_METRICS,
+            "crash_free_fake": SingularEntityDerivedMetric(
+                name="crash_free_fake",
+                metrics=["crashed_sessions", "sessions_errored_set"],
+                unit="percentage",
+                snql=lambda *args, entity, metric_ids, alias=None: _percentage_in_snql(
+                    *args, entity, metric_ids, alias="crash_free_fake"
+                ),
+            ),
+        }
+    )
+    def test_derived_metric_incorrectly_defined_as_singular_entity(self):
+        for status in ["ok", "crashed"]:
+            for minute in range(4):
+                self.store_session(
+                    self.build_session(
+                        project_id=self.project.id,
+                        started=(time.time() // 60 - minute) * 60,
+                        status=status,
+                    )
+                )
+        response = self.get_response(
+            self.organization.slug,
+            field=["crash_free_fake"],
+            statsPeriod="6m",
+            interval="1m",
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Derived Metric crash_free_fake cannot be calculated from a single entity"
+        )
 
     @with_feature(FEATURE_FLAG)
     def test_crash_free_percentage(self):
@@ -1152,7 +1191,7 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
 
     @with_feature(FEATURE_FLAG)
     def test_incorrect_errored_sessions(self):
-        # ToDo: Test that attempts to call `sum(errored_sessions)` as
+        # ToDo: Test that attempts to call `sum(errored_sessions)`
         raise NotImplementedError()
 
     @with_feature(FEATURE_FLAG)
@@ -1216,15 +1255,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
             ],
             entity="metrics_sets",
         )
-
-        # data = MetricsReleaseHealthBackend().get_release_health_data_overview(
-        #     project_releases=[
-        #         (self.project.id, "foo"),
-        #     ],
-        #     summary_stats_period="24h",
-        #     health_stats_period="24h",
-        #     stat="sessions",
-        # )
         response = self.get_success_response(
             self.organization.slug,
             field=["errored_sessions", "errored_preaggr", "sessions_errored_set"],

@@ -42,41 +42,10 @@ from .helpers import (
     Tag,
     TagValue,
     get_intervals,
-    parse_field,
+    parse_field, _get_single_metric_info, _get_data,
 )
 
 _GRANULARITY = 24 * 60 * 60  # coarsest granularity
-
-
-def _get_data(
-    *,
-    entity_key: EntityKey,
-    select: List[Column],
-    where: List[Condition],
-    groupby: List[Column],
-    projects,
-    org_id,
-    referrer: str,
-) -> Mapping[str, Any]:
-    # Round timestamp to minute to get cache efficiency:
-    now = datetime.now().replace(second=0, microsecond=0)
-
-    query = Query(
-        dataset=Dataset.Metrics.value,
-        match=Entity(entity_key.value),
-        select=select,
-        groupby=groupby,
-        where=[
-            Condition(Column("org_id"), Op.EQ, org_id),
-            Condition(Column("project_id"), Op.IN, [p.id for p in projects]),
-            Condition(Column(TS_COL_QUERY), Op.GTE, now - timedelta(hours=24)),
-            Condition(Column(TS_COL_QUERY), Op.LT, now),
-        ]
-        + where,
-        granularity=Granularity(_GRANULARITY),
-    )
-    result = raw_snql_query(query, referrer, use_cache=True)
-    return result["data"]
 
 
 def _get_metrics_for_entity(entity_key: EntityKey, projects, org_id) -> Mapping[str, Any]:
@@ -120,39 +89,7 @@ def get_metrics(projects: Sequence[Project]) -> Sequence[MetricMeta]:
 
 def get_single_metric(projects: Sequence[Project], metric_name: str) -> MetricMetaWithTagKeys:
     """Get metadata for a single metric, without tag values"""
-    assert projects
-
-    metric_id = indexer.resolve(metric_name)
-
-    if metric_id is None:
-        raise InvalidParams
-
-    for metric_type in ("counter", "set", "distribution"):
-        # TODO: What if metric_id exists for multiple types / units?
-        entity_key = METRIC_TYPE_TO_ENTITY[metric_type]
-        data = _get_data(
-            entity_key=entity_key,
-            select=[Column("metric_id"), Column("tags.key")],
-            where=[Condition(Column("metric_id"), Op.EQ, metric_id)],
-            groupby=[Column("metric_id"), Column("tags.key")],
-            referrer="snuba.metrics.meta.get_single_metric",
-            projects=projects,
-            org_id=projects[0].organization_id,
-        )
-        if data:
-            tag_ids = {tag_id for row in data for tag_id in row["tags.key"]}
-            return {
-                "name": metric_name,
-                "type": metric_type,
-                "operations": AVAILABLE_OPERATIONS[entity_key.value],
-                "tags": sorted(
-                    ({"key": reverse_resolve(tag_id)} for tag_id in tag_ids),
-                    key=itemgetter("key"),
-                ),
-                "unit": None,
-            }
-
-    raise InvalidParams
+    return _get_single_metric_info(projects, metric_name)
 
 
 def _get_metrics_filter(metric_names: Optional[Sequence[str]]) -> Optional[List[Condition]]:
