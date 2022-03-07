@@ -338,6 +338,7 @@ INSTALLED_APPS = (
     "sentry.analytics.events",
     "sentry.nodestore",
     "sentry.search",
+    "sentry.replay",
     "sentry.sentry_metrics.indexer",
     "sentry.snuba",
     "sentry.lang.java.apps.Config",

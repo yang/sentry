@@ -1685,6 +1685,10 @@ urlpatterns = [
         include(
             [
                 url(
+                    r"^(?P<organization_slug>[^\/]+)/(?P<project_slug>[^\/]+)/",
+                    include("sentry.replay.urls"),
+                ),
+                url(
                     r"^(?P<organization_slug>[^\/]+)/rule-conditions/$",
                     ProjectAgnosticRuleConditionsEndpoint.as_view(),
                     name="sentry-api-0-project-agnostic-rule-conditions",

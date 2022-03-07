@@ -7,6 +7,7 @@ from django.views.generic import RedirectView
 
 from sentry.auth.providers.saml2.provider import SAML2AcceptACSView, SAML2MetadataView, SAML2SLSView
 from sentry.charts.endpoints import serve_chartcuterie_config
+from sentry.replay.replay_store import ReplayStoreEndpoint
 from sentry.web import api
 from sentry.web.frontend import accounts, generic
 from sentry.web.frontend.account_identity import AccountIdentityAssociateView
@@ -116,6 +117,11 @@ urlpatterns += [
     ),
     # Versioned API
     url(r"^api/0/", include("sentry.api.urls")),
+    url(
+        r"^t-api/(?P<project_id>[^/]+)/replay-store/(?P<session_id>[^/]+)/$",
+        ReplayStoreEndpoint.as_view(),
+        name="sentry-replay-store",
+    ),
     # Legacy unversioned endpoints
     url(
         r"^api/hooks/mailgun/inbound/",
