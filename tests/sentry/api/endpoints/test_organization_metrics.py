@@ -1,4 +1,6 @@
+import copy
 import time
+import inspect
 from operator import itemgetter
 from typing import Optional
 from unittest import mock
@@ -7,6 +9,7 @@ from django.urls import reverse
 from freezegun import freeze_time
 
 from sentry.models import ApiToken
+from unittest.mock import patch
 from sentry.sentry_metrics import indexer
 from sentry.sentry_metrics.sessions import SessionMetricKey
 from sentry.snuba.metrics.fields import DERIVED_METRICS, SingularEntityDerivedMetric
@@ -17,6 +20,29 @@ from sentry.testutils.helpers import with_feature
 from sentry.utils.cursors import Cursor
 
 FEATURE_FLAG = "organizations:metrics"
+
+MOCKED_DERIVED_METRICS = copy.deepcopy(DERIVED_METRICS)
+MOCKED_DERIVED_METRICS.update(
+    {
+        "crash_free_fake": SingularEntityDerivedMetric(
+            metric_name="crash_free_fake",
+            metrics=["session.crashed", "session.errored_set"],
+            unit="percentage",
+            snql=lambda *args, entity, metric_ids, alias=None: percentage(
+                *args, entity, metric_ids, alias="crash_free_fake"
+            ),
+        )
+    }
+)
+
+
+def apply_decorator_to_all_methods(decorator):
+    def decorate(cls):
+        for name, fn in inspect.getmembers(cls, inspect.isfunction):
+            setattr(cls, name, decorator(fn))
+        return cls
+
+    return decorate
 
 
 class OrganizationMetricsPermissionTest(APITestCase):
@@ -33,7 +59,6 @@ class OrganizationMetricsPermissionTest(APITestCase):
         url = reverse(endpoint, args=(self.project.organization.slug,) + args)
         return self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {token.token}", format="json")
 
-    @with_feature(FEATURE_FLAG)
     def test_permissions(self):
 
         token = ApiToken.objects.create(user=self.user, scope_list=[])
@@ -56,6 +81,7 @@ class OrganizationMetricsPermissionTest(APITestCase):
             assert response.status_code == 404
 
 
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricMetaIntegrationTest(SessionMetricsTestCase, APITestCase):
     def setUp(self):
         super().setUp()
@@ -125,6 +151,7 @@ class OrganizationMetricMetaIntegrationTest(SessionMetricsTestCase, APITestCase)
         )
 
 
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricsIndexIntegrationTest(OrganizationMetricMetaIntegrationTest):
 
     endpoint = "sentry-api-0-organization-metrics-index"
@@ -161,7 +188,6 @@ class OrganizationMetricsIndexIntegrationTest(OrganizationMetricMetaIntegrationT
             {"name": "session.init", "type": "numeric", "operations": [], "unit": "sessions"},
         ]
 
-    @with_feature(FEATURE_FLAG)
     def test_metrics_index(self):
         """
 
@@ -188,7 +214,7 @@ class OrganizationMetricsIndexIntegrationTest(OrganizationMetricMetaIntegrationT
         response = self.get_success_response(self.organization.slug, project=[self.proj2.id])
         assert response.data == self.session_metrics_meta
 
-    @with_feature(FEATURE_FLAG)
+    @patch("sentry.snuba.metrics.fields.base.DERIVED_METRICS", MOCKED_DERIVED_METRICS)
     def test_metrics_index_invalid_derived_metric(self):
         for errors, minute in [(0, 0), (2, 1)]:
             self.store_session(
@@ -200,19 +226,6 @@ class OrganizationMetricsIndexIntegrationTest(OrganizationMetricMetaIntegrationT
                     errors=errors,
                 )
             )
-
-        DERIVED_METRICS.update(
-            {
-                "crash_free_fake": SingularEntityDerivedMetric(
-                    metric_name="crash_free_fake",
-                    metrics=["session.crashed", "session.errored_set"],
-                    unit="percentage",
-                    snql=lambda *args, entity, metric_ids, alias=None: percentage(
-                        *args, entity, metric_ids, alias="crash_free_fake"
-                    ),
-                )
-            }
-        )
         response = self.get_success_response(self.organization.slug, project=[self.proj2.id])
         assert response.data == sorted(
             self.session_metrics_meta
@@ -234,11 +247,11 @@ class OrganizationMetricsIndexIntegrationTest(OrganizationMetricMetaIntegrationT
         )
 
 
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricDetailsIntegrationTest(OrganizationMetricMetaIntegrationTest):
 
     endpoint = "sentry-api-0-organization-metric-details"
 
-    @with_feature(FEATURE_FLAG)
     def test_metric_details(self):
         # metric1:
         response = self.get_success_response(
@@ -287,12 +300,63 @@ class OrganizationMetricDetailsIntegrationTest(OrganizationMetricMetaIntegration
             "tags": [],
         }
 
+    def test_derived_metric_details(self):
+        # 1st Test: Test for derived metrics when indexer does not have a value
+        response = self.get_response(
+            self.organization.slug,
+            "whatever_metric",
+        )
+        assert response.status_code == 404
 
+        # 2nd Test: Test for derived metrics when indexer does have a value but no data in dataset
+        indexer.record("sentry.sessions.session")
+        response = self.get_success_response(
+            self.organization.slug,
+            "session.crash_free_rate",
+        )
+        print(response.data)
+        # 3rd Test: Test for derived metrics when indexer and dataset have data
+        self.store_session(
+            self.build_session(
+                project_id=self.proj2.id,
+                started=(time.time() // 60) * 60,
+                status="ok",
+                release="foobar@2.0",
+            )
+        )
+        response = self.get_success_response(
+            self.organization.slug,
+            "session.crash_free_rate",
+        )
+        assert response.data == {}
+
+        # 4th Test: Test for incorrect derived metrics
+        DERIVED_METRICS.update(
+            {
+                "crash_free_fake": SingularEntityDerivedMetric(
+                    metric_name="crash_free_fake",
+                    metrics=["session.crashed", "session.errored_set"],
+                    unit="percentage",
+                    snql=lambda *args, entity, metric_ids, alias=None: percentage(
+                        *args, entity, metric_ids, alias="crash_free_fake"
+                    ),
+                )
+            }
+        )
+        response = self.get_response(
+            self.organization.slug,
+            "crash_free_fake",
+        )
+        assert response.status_code == 400
+
+        # 5th Test: Same entity multiple metrics but only one of them present
+
+
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricsTagsIntegrationTest(OrganizationMetricMetaIntegrationTest):
 
     endpoint = "sentry-api-0-organization-metrics-tags"
 
-    @with_feature(FEATURE_FLAG)
     def test_metric_tags(self):
         response = self.get_success_response(
             self.organization.slug,
@@ -320,7 +384,25 @@ class OrganizationMetricsTagsIntegrationTest(OrganizationMetricMetaIntegrationTe
         )
         assert response.data == []
 
-    @with_feature(FEATURE_FLAG)
+    def test_metric_details_metric_does_not_exist_in_indexer(self):
+        assert (
+            self.get_response(
+                self.organization.slug,
+                metric=["foo.bar"],
+            ).data
+            == []
+        )
+
+    def test_metric_details_metric_does_not_have_data(self):
+        indexer.record("foo.bar")
+        assert (
+            self.get_response(
+                self.organization.slug,
+                metric=["foo.bar"],
+            ).data
+            == []
+        )
+
     def test_derived_metric_tags(self):
         for minute in range(4):
             self.store_session(
@@ -351,18 +433,8 @@ class OrganizationMetricsTagsIntegrationTest(OrganizationMetricMetaIntegrationTe
             {"key": "session.status"},
         ]
 
-        DERIVED_METRICS.update(
-            {
-                "crash_free_fake": SingularEntityDerivedMetric(
-                    metric_name="crash_free_fake",
-                    metrics=["session.crashed", "session.errored_set"],
-                    unit="percentage",
-                    snql=lambda *args, entity, metric_ids, alias=None: percentage(
-                        *args, entity, metric_ids, alias="crash_free_fake"
-                    ),
-                )
-            }
-        )
+    @patch("sentry.snuba.metrics.fields.base.DERIVED_METRICS", MOCKED_DERIVED_METRICS)
+    def test_incorrectly_setup_derived_metric(self):
         self.store_session(
             self.build_session(
                 project_id=self.project.id,
@@ -374,7 +446,7 @@ class OrganizationMetricsTagsIntegrationTest(OrganizationMetricMetaIntegrationTe
         )
         response = self.get_response(
             self.organization.slug,
-            metric=["crash_free_fake", "session.init"],
+            metric=["crash_free_fake"],
         )
         assert response.status_code == 400
         assert response.json()["detail"] == (
@@ -382,38 +454,27 @@ class OrganizationMetricsTagsIntegrationTest(OrganizationMetricMetaIntegrationTe
             "Please revise the definition of these singular entity derived metrics"
         )
 
-        assert (
-            self.get_response(
-                self.organization.slug,
-                metric=["foo.bar"],
-            ).data
-            == []
-        )
 
-
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricsTagDetailsIntegrationTest(OrganizationMetricMetaIntegrationTest):
 
     endpoint = "sentry-api-0-organization-metrics-tag-details"
 
-    @with_feature(FEATURE_FLAG)
     def test_unknown_tag(self):
         indexer.record("bar")
         response = self.get_success_response(self.project.organization.slug, "bar")
         assert response.data == []
 
-    @with_feature(FEATURE_FLAG)
     def test_non_existing_tag(self):
         response = self.get_response(self.project.organization.slug, "bar")
         assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     def test_non_existing_filter(self):
         indexer.record("bar")
         response = self.get_response(self.project.organization.slug, "bar", metric="bad")
         assert response.status_code == 200
         assert response.data == []
 
-    @with_feature(FEATURE_FLAG)
     def test_metric_tag_details(self):
         response = self.get_success_response(
             self.organization.slug,
@@ -452,7 +513,6 @@ class OrganizationMetricsTagDetailsIntegrationTest(OrganizationMetricMetaIntegra
         )
         assert response.data == []
 
-    @with_feature(FEATURE_FLAG)
     def test_tag_values_for_derived_metrics(self):
         self.store_session(
             self.build_session(
@@ -470,30 +530,38 @@ class OrganizationMetricsTagDetailsIntegrationTest(OrganizationMetricMetaIntegra
         )
         assert response.data == [{"key": "release", "value": "foobar"}]
 
-        DERIVED_METRICS.update(
-            {
-                "crash_free_fake": SingularEntityDerivedMetric(
-                    metric_name="crash_free_fake",
-                    metrics=["session.crashed", "session.errored_set"],
-                    unit="percentage",
-                    snql=lambda *args, entity, metric_ids, alias=None: percentage(
-                        *args, entity, metric_ids, alias="crash_free_fake"
-                    ),
-                )
-            }
+    def test_tag_not_available_in_the_indexer(self):
+        response = self.get_response(
+            self.organization.slug,
+            "release",
+            metric=["random_foo_metric"],
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Tag release is not available in the indexer"
+
+    @patch("sentry.snuba.metrics.fields.base.DERIVED_METRICS", MOCKED_DERIVED_METRICS)
+    def test_incorrectly_setup_derived_metric(self):
+        self.store_session(
+            self.build_session(
+                project_id=self.project.id,
+                started=(time.time() // 60) * 60,
+                status="ok",
+                release="foobar",
+                errors=2,
+            )
         )
         response = self.get_response(
             self.organization.slug,
             "release",
-            metric=["crash_free_fake", "session.init"],
+            metric=["crash_free_fake"],
         )
-        assert response.status_code == 400
         assert response.json()["detail"] == (
             "The following metrics {'crash_free_fake'} cannot be computed from single entities. "
             "Please revise the definition of these singular entity derived metrics"
         )
 
 
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
     endpoint = "sentry-api-0-organization-metrics-data"
 
@@ -502,19 +570,16 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         self.project2 = self.create_project()
         self.login_as(user=self.user)
 
-    @with_feature(FEATURE_FLAG)
     def test_missing_field(self):
         response = self.get_response(self.project.organization.slug)
         assert response.status_code == 400
         assert response.json()["detail"] == 'Request is missing a "field"'
 
-    @with_feature(FEATURE_FLAG)
     def test_invalid_field(self):
         for field in ["", "(*&%", "foo(session", "foo(session)"]:
             response = self.get_response(self.project.organization.slug, field=field)
             assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     def test_groupby_single(self):
         indexer.record("environment")
         response = self.get_response(
@@ -525,7 +590,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
 
         assert response.status_code == 200
 
-    @with_feature(FEATURE_FLAG)
     def test_invalid_filter(self):
         query = "release:foo or "
         response = self.get_response(
@@ -536,7 +600,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.status_code == 400, query
 
-    @with_feature(FEATURE_FLAG)
     def test_valid_filter(self):
         for tag in ("release", "environment"):
             indexer.record(tag)
@@ -549,14 +612,12 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.data.keys() == {"start", "end", "query", "intervals", "groups"}
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_unknown(self):
         response = self.get_response(
             self.project.organization.slug, field="sum(sentry.sessions.session)", orderBy="foo"
         )
         assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_tag(self):
         """Order by tag is not supported (yet)"""
         response = self.get_response(
@@ -567,7 +628,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     def test_pagination_limit_without_orderby(self):
         """
         Test that ensures an exception is raised when pagination `per_page` parameter is sent
@@ -584,7 +644,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             "'per_page' is only supported in combination with 'orderBy'"
         )
 
-    @with_feature(FEATURE_FLAG)
     def test_pagination_offset_without_orderby(self):
         """
         Test that ensures an exception is raised when pagination `per_page` parameter is sent
@@ -601,7 +660,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             "'cursor' is only supported in combination with 'orderBy'"
         )
 
-    @with_feature(FEATURE_FLAG)
     def test_statsperiod_invalid(self):
         response = self.get_response(
             self.project.organization.slug,
@@ -610,7 +668,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     def test_separate_projects(self):
         # Insert session metrics:
         self.store_session(self.build_session(project_id=self.project.id))
@@ -637,7 +694,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         # Request for single project gives a counter of one:
         assert count_sessions(project_id=self.project2.id) == 1
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby(self):
         # Record some strings
         metric_id = indexer.record("sentry.transactions.measurements.lcp")
@@ -699,7 +755,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
                 "count(sentry.transactions.measurements.lcp)": expected_count
             }
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile(self):
         # Record some strings
         metric_id = indexer.record("sentry.transactions.measurements.lcp")
@@ -750,7 +805,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
                 "p50(sentry.transactions.measurements.lcp)": [expected_count]
             }
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_pagination(self):
         metric_id = indexer.record("sentry.transactions.measurements.lcp")
         tag1 = indexer.record("tag1")
@@ -806,7 +860,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         assert groups[0]["by"] == {"tag1": "value1"}
         assert groups[0]["totals"] == {"p50(sentry.transactions.measurements.lcp)": 5}
 
-    @with_feature(FEATURE_FLAG)
     def test_limit_with_orderby_is_overridden_by_paginator_limit(self):
         """
         Test that ensures when an `orderBy` clause is set, then the paginator limit overrides the
@@ -849,7 +902,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         groups = response.data["groups"]
         assert len(groups) == 1
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_many_fields_one_entity_no_data(self):
         """
         Test that ensures that when metrics data is available then an empty response is returned
@@ -876,7 +928,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         groups = response.data["groups"]
         assert len(groups) == 0
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_many_fields_one_entity(self):
         """
         Test that ensures when transactions are ordered correctly when all the fields requested
@@ -959,7 +1010,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
                 "p50(sentry.transactions.measurements.fcp)": [expected_fcp_count],
             }
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_many_fields_multiple_entities(self):
         """
         Test that ensures when transactions are ordered correctly when all the fields requested
@@ -1039,7 +1089,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             }
 
     @freeze_time("2018-12-11 03:21:34")
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_many_fields_multiple_entities_with_paginator(self):
         """
         Test that ensures when transactions are ordered correctly when all the fields requested
@@ -1135,7 +1184,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             "count_unique(sentry.transactions.user)": [0, 0, 0, 3, 0, 1],
         }
 
-    @with_feature(FEATURE_FLAG)
     def test_series_are_limited_to_total_order_in_case_with_one_field_orderby(self):
         # Create time series [1, 2, 3, 4] for every release:
         for minute in range(4):
@@ -1164,7 +1212,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
 
         assert len(response.data["groups"]) == 1
 
-    @with_feature(FEATURE_FLAG)
     def test_one_field_orderby_with_no_groupby_returns_one_row(self):
         # Create time series [1, 2, 3, 4] for every release:
         for minute in range(4):
@@ -1192,7 +1239,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
 
         assert len(response.data["groups"]) == 1
 
-    @with_feature(FEATURE_FLAG)
     def test_orderby_percentile_with_many_fields_multiple_entities_with_missing_data(self):
         """
         Test that ensures when transactions table has null values for some fields (i.e. fields
@@ -1252,7 +1298,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
                 "p50(sentry.transactions.measurements.lcp)": [expected_lcp_count],
             }
 
-    @with_feature(FEATURE_FLAG)
     def test_groupby_project(self):
         self.store_session(self.build_session(project_id=self.project2.id))
         for _ in range(2):
@@ -1282,7 +1327,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
             totals = group["totals"]
             assert totals == {"sum(sentry.sessions.session)": expected_count}
 
-    @with_feature(FEATURE_FLAG)
     def test_unknown_groupby(self):
         """Use a tag name in groupby that does not exist in the indexer"""
         # Insert session metrics:
@@ -1312,7 +1356,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.status_code == 400
 
-    @with_feature(FEATURE_FLAG)
     @mock.patch(
         "sentry.api.endpoints.organization_metrics.OrganizationMetricsDataEndpoint.default_per_page",
         1,
@@ -1336,7 +1379,6 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         assert group["totals"]["sum(sentry.sessions.session)"] == 4
         assert group["series"]["sum(sentry.sessions.session)"] == [1, 1, 1, 1]
 
-    @with_feature(FEATURE_FLAG)
     def test_unknown_filter(self):
         """Use a tag key/value in filter that does not exist in the indexer"""
         # Insert session metrics:
@@ -1364,6 +1406,7 @@ class OrganizationMetricDataTest(SessionMetricsTestCase, APITestCase):
         assert groups[0]["series"]["sum(sentry.sessions.session)"] == [0]
 
 
+@apply_decorator_to_all_methods(with_feature(FEATURE_FLAG))
 class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
     endpoint = "sentry-api-0-organization-metrics-data"
 
@@ -1371,20 +1414,8 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
         super().setUp()
         self.login_as(user=self.user)
 
-    @with_feature(FEATURE_FLAG)
+    @patch("sentry.snuba.metrics.fields.base.DERIVED_METRICS", MOCKED_DERIVED_METRICS)
     def test_derived_metric_incorrectly_defined_as_singular_entity(self):
-        DERIVED_METRICS.update(
-            {
-                "crash_free_fake": SingularEntityDerivedMetric(
-                    metric_name="crash_free_fake",
-                    metrics=["session.crashed", "session.errored_set"],
-                    unit="percentage",
-                    snql=lambda *args, entity, metric_ids, alias=None: percentage(
-                        *args, entity, metric_ids, alias="crash_free_fake"
-                    ),
-                )
-            }
-        )
         for status in ["ok", "crashed"]:
             for minute in range(4):
                 self.store_session(
@@ -1405,7 +1436,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
             "Derived Metric crash_free_fake cannot be calculated from a single entity"
         )
 
-    @with_feature(FEATURE_FLAG)
     def test_crash_free_percentage(self):
         for status in ["ok", "crashed"]:
             for minute in range(4):
@@ -1428,7 +1458,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
         assert group["totals"]["session.crashed"] == 4
         assert group["series"]["session.crash_free_rate"] == [None, None, 50, 50, 50, 50]
 
-    @with_feature(FEATURE_FLAG)
     def test_crash_free_percentage_with_orderby(self):
         for status in ["ok", "crashed"]:
             for minute in range(4):
@@ -1467,7 +1496,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
         assert group["totals"]["session.crash_free_rate"] == 50
         assert group["series"]["session.crash_free_rate"] == [None, None, 50, 50, 50, 50]
 
-    @with_feature(FEATURE_FLAG)
     def test_crash_free_rate_when_no_session_metrics_data_exist(self):
         response = self.get_success_response(
             self.organization.slug,
@@ -1483,7 +1511,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
         assert group["series"]["sum(sentry.sessions.session)"] == [0]
         assert group["series"]["session.crash_free_rate"] == [None]
 
-    @with_feature(FEATURE_FLAG)
     def test_crash_free_rate_when_no_session_metrics_data_with_orderby_and_groupby(self):
         indexer.record("release")
         response = self.get_success_response(
@@ -1497,7 +1524,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
         )
         assert response.data["groups"] == []
 
-    @with_feature(FEATURE_FLAG)
     def test_incorrect_crash_free_rate(self):
         response = self.get_response(
             self.organization.slug,
@@ -1510,7 +1536,6 @@ class DerivedMetricsDataTest(SessionMetricsTestCase, APITestCase):
             "field as it is already a derived metric with an aggregation applied to it."
         )
 
-    @with_feature(FEATURE_FLAG)
     def test_errored_sessions(self):
         session_metric = indexer.record(SessionMetricKey.SESSION.value)
         indexer.record("sentry.sessions.session.duration")

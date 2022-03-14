@@ -11,6 +11,7 @@ __all__ = (
     "get_tags",
     "get_tag_values",
     "get_series",
+    "get_single_metric_info",
 )
 
 from collections import defaultdict
@@ -42,7 +43,7 @@ from sentry.snuba.metrics.utils import (
     MetricMeta,
     MetricType,
     Tag,
-    TagValue,
+    TagValue, MetricMetaWithTagKeys,
 )
 from sentry.utils.snuba import raw_snql_query
 
@@ -180,6 +181,43 @@ def _validate_requested_derived_metrics(
         )
 
 
+def get_single_metric_info(projects: Sequence[Project], metric_name: str) -> MetricMetaWithTagKeys:
+    assert projects
+
+    try:
+        metric_ids = _get_metrics_filter_ids([metric_name])
+    except MetricDoesNotExistInIndexer:
+        raise InvalidParams
+    else:
+        where = [Condition(Column("metric_id"), Op.IN, list(metric_ids))] if metric_ids else []
+
+    for metric_type in ("counter", "set", "distribution"):
+        entity_key = METRIC_TYPE_TO_ENTITY[metric_type]
+        data = run_metrics_query(
+            entity_key=entity_key,
+            select=[Column("metric_id"), Column("tags.key")],
+            where=where,
+            groupby=[Column("metric_id"), Column("tags.key")],
+            referrer="snuba.metrics.meta.get_single_metric",
+            projects=projects,
+            org_id=projects[0].organization_id,
+        )
+        if data:
+            tag_ids = {tag_id for row in data for tag_id in row["tags.key"]}
+            return {
+                "name": metric_name,
+                "type": metric_type,
+                "operations": AVAILABLE_OPERATIONS[entity_key.value],
+                "tags": sorted(
+                    ({"key": reverse_resolve(tag_id)} for tag_id in tag_ids),
+                    key=itemgetter("key"),
+                ),
+                "unit": None,
+            }
+
+    raise InvalidParams(f"Raw metric {metric_name} does not exit")
+
+
 def get_tags(projects: Sequence[Project], metric_names: Optional[Sequence[str]]) -> Sequence[Tag]:
     """Get all metric tags for the given projects and metric_names"""
     assert projects
@@ -214,11 +252,6 @@ def get_tags(projects: Sequence[Project], metric_names: Optional[Sequence[str]])
         for row in rows:
             tag_ids_per_metric_id[row["metric_id"]].extend(row["tags.key"])
             supported_metric_ids_in_entities[metric_type].append(row["metric_id"])
-
-        # If we are trying to find the tags for only one metric name, then no need to query other
-        # entities once we find data for that metric_name in one of the entity
-        if metric_names and len(metric_names) == 1 and rows:
-            break
 
     # If we get not results back from snuba, then just return an empty set
     if not tag_ids_per_metric_id:
@@ -258,7 +291,7 @@ def get_tag_values(
 
     tag_id = indexer.resolve(tag_name)
     if tag_id is None:
-        raise InvalidParams
+        raise InvalidParams(f"Tag {tag_name} is not available in the indexer")
 
     try:
         metric_ids = _get_metrics_filter_ids(metric_names)
@@ -293,11 +326,6 @@ def get_tag_values(
             if value_id > 0:
                 metric_id = row["metric_id"]
                 tag_values[metric_id].append(value_id)
-
-        # If we are trying to find the tag values for only one metric name, then no need to query
-        # other entities once we find data for that metric_name in one of the entities
-        if metric_names and len(metric_names) == 1 and rows:
-            break
 
     value_id_lists = tag_values.values()
     if metric_names is not None:
@@ -370,6 +398,7 @@ def get_series(projects: Sequence[Project], query: QueryDefinition) -> dict:
             initial_query_results = raw_snql_query(
                 initial_snuba_query, use_cache=False, referrer="api.metrics.totals.initial_query"
             )["data"]
+
         except StopIteration:
             # This can occur when requesting a list of derived metrics that are not have no data
             # for the passed projects

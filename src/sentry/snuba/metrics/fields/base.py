@@ -1,7 +1,6 @@
 __all__ = (
     "metric_object_factory",
     "run_metrics_query",
-    "get_single_metric_info",
     "RawMetric",
     "MetricFieldBase",
     "RawMetric",
@@ -12,7 +11,6 @@ __all__ = (
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from operator import itemgetter
 from typing import Any, List, Mapping, Optional, Sequence, Set
 
 from snuba_sdk import Column, Condition, Entity, Function, Granularity, Op, Query
@@ -79,7 +77,7 @@ def run_metrics_query(
     return result["data"]
 
 
-def get_single_metric_info(projects: Sequence[Project], metric_name: str) -> MetricMetaWithTagKeys:
+def _get_entity_of_metric_name(projects: Sequence[Project], metric_name: str):
     assert projects
 
     metric_id = indexer.resolve(metric_name)
@@ -88,30 +86,18 @@ def get_single_metric_info(projects: Sequence[Project], metric_name: str) -> Met
         raise InvalidParams
 
     for metric_type in ("counter", "set", "distribution"):
-        # TODO: What if metric_id exists for multiple types / units?
         entity_key = METRIC_TYPE_TO_ENTITY[metric_type]
         data = run_metrics_query(
             entity_key=entity_key,
-            select=[Column("metric_id"), Column("tags.key")],
+            select=[Column("metric_id")],
             where=[Condition(Column("metric_id"), Op.EQ, metric_id)],
-            groupby=[Column("metric_id"), Column("tags.key")],
-            referrer="snuba.metrics.meta.get_single_metric",
+            groupby=[Column("metric_id")],
+            referrer="snuba.metrics.meta.get_entity_of_metric",
             projects=projects,
             org_id=projects[0].organization_id,
         )
         if data:
-            tag_ids = {tag_id for row in data for tag_id in row["tags.key"]}
-            return {
-                "name": metric_name,
-                "type": metric_type,
-                "operations": AVAILABLE_OPERATIONS[entity_key.value],
-                "tags": sorted(
-                    ({"key": reverse_resolve(tag_id)} for tag_id in tag_ids),
-                    key=itemgetter("key"),
-                ),
-                "unit": None,
-            }
-
+            return entity_key
     raise InvalidParams(f"Raw metric {metric_name} does not exit")
 
 
@@ -242,8 +228,7 @@ class SingularEntityDerivedMetric(DerivedMetric):
         entity/entities these raw constituent metrics belong to.
         """
         if derived_metric_name not in DERIVED_METRICS:
-            metric_type = get_single_metric_info(projects, derived_metric_name)["type"]
-            return {METRIC_TYPE_TO_ENTITY[metric_type].value}
+            return {_get_entity_of_metric_name(projects, derived_metric_name).value}
 
         entities = set()
         derived_metric = DERIVED_METRICS[derived_metric_name]
