@@ -1,6 +1,6 @@
 import itertools
 from collections import defaultdict
-from typing import DefaultDict, Dict, MutableMapping, Optional, Set
+from typing import DefaultDict, Dict, List, Optional
 
 from sentry.sentry_metrics.sessions import SessionMetricKey
 
@@ -33,13 +33,10 @@ class SimpleIndexer(StringIndexer):
         self._strings: DefaultDict[str, int] = defaultdict(self._counter.__next__)
         self._reverse: Dict[int, str] = {}
 
-    def bulk_record(self, org_strings: MutableMapping[int, Set[str]]) -> Dict[str, int]:
-        strings = set()
-        for _, strs in org_strings.items():
-            strings.update(strs)
+    def bulk_record(self, strings: List[str]) -> Dict[str, int]:
         return {string: self._record(string) for string in strings}
 
-    def record(self, org_id: int, string: str) -> int:
+    def record(self, string: str) -> int:
         return self._record(string)
 
     def resolve(self, string: str) -> Optional[int]:

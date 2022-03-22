@@ -712,4 +712,4 @@ class MetricsCrashRateAlertCreationTest(AlertRuleCreateEndpointTestCrashRateAler
             "init",
             "crashed",
         ]:
-            indexer.record(self.organization.id, tag)
+            indexer.record(tag)
