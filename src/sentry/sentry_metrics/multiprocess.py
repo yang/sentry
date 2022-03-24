@@ -376,6 +376,9 @@ def process_messages(
             strings.update(parsed_strings)
 
     metrics.incr("process_messages.total_strings_indexer_lookup", amount=len(strings))
+    logger.warning(">>>")
+    logger.warning(strings)
+    logger.warning(org_strings)
 
     with metrics.timer("metrics_consumer.bulk_record"):
         mapping = indexer.bulk_record(org_strings)
