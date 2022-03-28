@@ -8,12 +8,15 @@ export type StepData = {
 // Not sure if we need platform info to be passed down
 export type StepProps = {
   active: boolean;
+  addIntegration: (integration: string) => void;
   addPlatform: (platform: PlatformKey) => void;
   genSkipOnboardingLink: () => React.ReactNode;
+  integrationsSelected: string[];
   onComplete: () => void;
   orgId: string;
   organization: Organization;
   platforms: PlatformKey[];
+  removeIntegration: (integration: string) => void;
   removePlatform: (platform: PlatformKey) => void;
   search: string;
   stepIndex: number;

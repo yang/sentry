@@ -19,6 +19,7 @@ import withOrganization from 'sentry/utils/withOrganization';
 import withProjects from 'sentry/utils/withProjects';
 import PageCorners from 'sentry/views/onboarding/components/pageCorners';
 
+import IntegrationSelection from './integration';
 import PlatformSelection from './platform';
 import SetupDocs from './setupDocs';
 import {StepDescriptor} from './types';
@@ -46,6 +47,11 @@ const ONBOARDING_STEPS: StepDescriptor[] = [
     title: t('Select platforms'),
     Component: PlatformSelection,
     hasFooter: true,
+  },
+  {
+    id: 'select-integration',
+    title: t('Select Integrations'),
+    Component: IntegrationSelection,
   },
   {
     id: 'setup-docs',
@@ -76,6 +82,7 @@ function Onboarding(props: Props) {
 
   React.useEffect(updateCornerVariant, []);
   const [platforms, setPlatforms] = React.useState<PlatformKey[]>([]);
+  const [integrations, setIntegrations] = React.useState<string[]>([]);
 
   const addPlatform = (platform: PlatformKey) => {
     setPlatforms([...platforms, platform]);
@@ -83,6 +90,14 @@ function Onboarding(props: Props) {
 
   const removePlatform = (platform: PlatformKey) => {
     setPlatforms(platforms.filter(p => p !== platform));
+  };
+
+  const addIntegration = (integration: string) => {
+    setIntegrations([...integrations, integration]);
+  };
+
+  const removeIntegration = (integration: string) => {
+    setIntegrations(integrations.filter(p => p !== integration));
   };
 
   const goNextStep = (step: StepDescriptor) => {
@@ -142,10 +157,15 @@ function Onboarding(props: Props) {
                 orgId={props.params.orgId}
                 organization={props.organization}
                 search={props.location.search}
-                platforms={platforms}
-                addPlatform={addPlatform}
-                removePlatform={removePlatform}
-                genSkipOnboardingLink={genSkipOnboardingLink}
+                integrationsSelected={integrations}
+                {...{
+                  platforms,
+                  addPlatform,
+                  removePlatform,
+                  addIntegration,
+                  removeIntegration,
+                  genSkipOnboardingLink,
+                }}
               />
             )}
           </OnboardingStep>

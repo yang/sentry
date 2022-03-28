@@ -4,7 +4,11 @@ import * as Sentry from '@sentry/react';
 import {motion} from 'framer-motion';
 import {PlatformIcon} from 'platformicons';
 
-import {addErrorMessage, addLoadingMessage} from 'sentry/actionCreators/indicator';
+import {
+  addErrorMessage,
+  addLoadingMessage,
+  clearIndicators,
+} from 'sentry/actionCreators/indicator';
 import {createProject} from 'sentry/actionCreators/projects';
 import ProjectActions from 'sentry/actions/projectActions';
 import Button from 'sentry/components/button';
@@ -49,6 +53,7 @@ export default function CreateProjectsFooter({
         platforms: platforms.join(','),
         organization,
       });
+      clearIndicators();
       onComplete();
     } catch (err) {
       addErrorMessage(t('Failed to create projects'));
@@ -75,7 +80,11 @@ export default function CreateProjectsFooter({
         ) : null}
       </SelectionWrapper>
       <ButtonWrapper>
-        <Button priority="primary" onClick={createProjects}>
+        <Button
+          priority="primary"
+          onClick={createProjects}
+          disabled={platforms.length === 0}
+        >
           {tn('Create Project', 'Create Projects', platforms.length)}
         </Button>
       </ButtonWrapper>
