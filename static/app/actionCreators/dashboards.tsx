@@ -64,7 +64,7 @@ export function fetchDashboard(
   promise.catch(response => {
     const errorResponse = response?.responseJSON ?? null;
 
-    if (errorResponse) {
+    if (typeof errorResponse === 'string') {
       addErrorMessage(errorResponse);
     } else {
       addErrorMessage(t('Unable to load dashboard'));
