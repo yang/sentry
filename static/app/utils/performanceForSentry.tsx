@@ -15,6 +15,7 @@ export function onRenderCallback(
 ) {
   try {
     const transaction = getCurrentSentryReactTransaction();
+
     if (transaction && actualDuration > MIN_UPDATE_SPAN_TIME) {
       const now = timestampWithMs();
       transaction.startChild({
@@ -150,6 +151,7 @@ export const VisuallyCompleteWithData = ({
             if (lcp) {
               newMeasurements.lcpDiffVCD = {value: lcp - time};
             }
+            newMeasurements.app_start_cold = {value: 123987};
 
             t.setTag('longTaskCount', longTaskCount.current);
             t.setMeasurements(newMeasurements);
