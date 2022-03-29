@@ -11,8 +11,8 @@ from requests.exceptions import SSLError
 from sentry.auth.exceptions import IdentityNotValid
 from sentry.http import safe_urlopen, safe_urlread
 from sentry.pipeline import PipelineView
-from sentry.shared_integrations.exceptions import ApiError
 from sentry.utils import json
+from sentry.utils.auth import handle_refresh_error
 from sentry.utils.http import absolute_uri
 
 from .base import Provider
@@ -120,60 +120,6 @@ class OAuth2Provider(Provider):
 
         return data
 
-    def handle_refresh_error(self, req, payload):
-        error_name = "unknown_error"
-        error_description = "no description available"
-        for name_key in ["error", "Error"]:
-            if name_key in payload:
-                error_name = payload.get(name_key)
-                break
-
-        for desc_key in ["error_description", "ErrorDescription"]:
-            if desc_key in payload:
-                error_description = payload.get(desc_key)
-                break
-
-        formatted_error = f"HTTP {req.status_code} ({error_name}): {error_description}"
-
-        if req.status_code == 401:
-            self.logger.info(
-                "identity.oauth.refresh.identity-not-valid-error",
-                extra={
-                    "error_name": error_name,
-                    "error_status_code": req.status_code,
-                    "error_description": error_description,
-                    "provider_key": self.key,
-                },
-            )
-            raise IdentityNotValid(formatted_error)
-
-        if req.status_code == 400:
-            # this may not be common, but at the very least Google will return
-            # an invalid grant when a user is suspended
-            if error_name == "invalid_grant":
-                self.logger.info(
-                    "identity.oauth.refresh.identity-not-valid-error",
-                    extra={
-                        "error_name": error_name,
-                        "error_status_code": req.status_code,
-                        "error_description": error_description,
-                        "provider_key": self.key,
-                    },
-                )
-                raise IdentityNotValid(formatted_error)
-
-        if req.status_code != 200:
-            self.logger.info(
-                "identity.oauth.refresh.api-error",
-                extra={
-                    "error_name": error_name,
-                    "error_status_code": req.status_code,
-                    "error_description": error_description,
-                    "provider_key": self.key,
-                },
-            )
-            raise ApiError(formatted_error)
-
     def refresh_identity(self, identity, *args, **kwargs):
         refresh_token = identity.data.get("refresh_token")
 
@@ -194,7 +140,7 @@ class OAuth2Provider(Provider):
         except Exception:
             payload = {}
 
-        self.handle_refresh_error(req, payload)
+        handle_refresh_error(request, payload, provider_key=self.key)
 
         identity.data.update(self.get_oauth_data(payload))
         return identity.update(data=identity.data)

@@ -5,6 +5,7 @@ from sentry.auth.exceptions import IdentityNotValid
 from sentry.http import safe_urlopen, safe_urlread
 from sentry.identity.oauth2 import OAuth2Provider
 from sentry.utils import json
+from sentry.utils.auth import handle_refresh_error
 from sentry.utils.http import absolute_uri
 
 logger = logging.getLogger("sentry.integration.gitlab")
@@ -98,16 +99,16 @@ class GitlabIdentityProvider(OAuth2Provider):
         kwargs["identity"] = identity
         data = self.get_refresh_token_params(refresh_token, *args, **kwargs)
 
-        req = safe_urlopen(url=refresh_token_url, headers={}, data=data)
+        request = safe_urlopen(url=refresh_token_url, headers={}, data=data)
 
         try:
-            body = safe_urlread(req)
+            body = safe_urlread(request)
             payload = json.loads(body)
         except Exception as e:
             # JSONDecodeError's will happen when we get a 301
             # from GitLab, and won't have the `code` attribute
             # we use the req.status_code instead in that case
-            error_status = getattr(e, "code", req.status_code)
+            error_status = getattr(e, "code", request.status_code)
             self.logger.info(
                 "gitlab.refresh-identity-failure",
                 extra={
@@ -118,7 +119,7 @@ class GitlabIdentityProvider(OAuth2Provider):
             )
             payload = {}
 
-        self.handle_refresh_error(req, payload)
+        handle_refresh_error(request, payload, provider_key=self.key)
 
         identity.data.update(get_oauth_data(payload))
         identity.update(data=identity.data)

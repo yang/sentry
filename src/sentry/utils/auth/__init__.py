@@ -13,6 +13,10 @@ from rest_framework.request import Request
 from sentry.models import Authenticator, User
 from sentry.utils import metrics
 
+from .errors import handle_refresh_error
+
+__all__ = ("handle_refresh_error",)
+
 logger = logging.getLogger("sentry.auth")
 
 _LOGIN_URL = None

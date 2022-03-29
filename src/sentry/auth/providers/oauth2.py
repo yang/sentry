@@ -11,6 +11,7 @@ from sentry.auth.provider import Provider
 from sentry.auth.view import AuthView
 from sentry.http import safe_urlopen, safe_urlread
 from sentry.utils import json
+from sentry.utils.auth import handle_refresh_error
 
 ERR_INVALID_STATE = "An error occurred while validating your request."
 
@@ -177,30 +178,15 @@ class OAuth2Provider(Provider):
             raise IdentityNotValid("Missing refresh token")
 
         data = self.get_refresh_token_params(refresh_token=refresh_token)
-        req = safe_urlopen(self.get_refresh_token_url(), data=data)
+        request = safe_urlopen(self.get_refresh_token_url(), data=data)
 
         try:
-            body = safe_urlread(req)
+            body = safe_urlread(request)
             payload = json.loads(body)
         except Exception:
             payload = {}
 
-        error = payload.get("error", "unknown_error")
-        error_description = payload.get("error_description", "no description available")
-
-        formatted_error = f"HTTP {req.status_code} ({error}): {error_description}"
-
-        if req.status_code == 401:
-            raise IdentityNotValid(formatted_error)
-
-        if req.status_code == 400:
-            # this may not be common, but at the very least Google will return
-            # an invalid grant when a user is suspended
-            if error == "invalid_grant":
-                raise IdentityNotValid(formatted_error)
-
-        if req.status_code != 200:
-            raise Exception(formatted_error)
+        handle_refresh_error(request, payload)
 
         auth_identity.data.update(self.get_oauth_data(payload))
         auth_identity.update(data=auth_identity.data)
