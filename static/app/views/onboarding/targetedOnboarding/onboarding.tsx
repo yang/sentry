@@ -100,6 +100,8 @@ function Onboarding(props: Props) {
     setIntegrations(integrations.filter(p => p !== integration));
   };
 
+  const clearIntegrationSelections = () => setIntegrations([]);
+
   const goNextStep = (step: StepDescriptor) => {
     const stepIndex = ONBOARDING_STEPS.findIndex(s => s.id === step.id);
     const nextStep = ONBOARDING_STEPS[stepIndex + 1];
@@ -165,6 +167,7 @@ function Onboarding(props: Props) {
                   addIntegration,
                   removeIntegration,
                   genSkipOnboardingLink,
+                  clearIntegrationSelections,
                 }}
               />
             )}

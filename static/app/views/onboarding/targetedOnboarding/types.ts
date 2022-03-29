@@ -10,6 +10,7 @@ export type StepProps = {
   active: boolean;
   addIntegration: (integration: string) => void;
   addPlatform: (platform: PlatformKey) => void;
+  clearIntegrationSelections: () => void;
   genSkipOnboardingLink: () => React.ReactNode;
   integrationsSelected: string[];
   onComplete: () => void;
