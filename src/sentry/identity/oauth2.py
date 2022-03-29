@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from django.views.decorators.csrf import csrf_exempt
 from requests.exceptions import SSLError
+from rest_framework.request import Request
+from rest_framework.response import Response
 
 from sentry.auth.exceptions import IdentityNotValid
 from sentry.http import safe_urlopen, safe_urlread
@@ -128,14 +130,15 @@ class OAuth2Provider(Provider):
 
         # XXX(meredith): This is used in VSTS's `get_refresh_token_params`
         kwargs["identity"] = identity
-        data = self.get_refresh_token_params(refresh_token, *args, **kwargs)
 
-        req = safe_urlopen(
-            url=self.get_refresh_token_url(), headers=self.get_refresh_token_headers(), data=data
+        request = safe_urlopen(
+            url=self.get_refresh_token_url(),
+            headers=self.get_refresh_token_headers(),
+            data=self.get_refresh_token_params(refresh_token, *args, **kwargs),
         )
 
         try:
-            body = safe_urlread(req)
+            body = safe_urlread(request)
             payload = json.loads(body)
         except Exception:
             payload = {}
@@ -144,10 +147,6 @@ class OAuth2Provider(Provider):
 
         identity.data.update(self.get_oauth_data(payload))
         return identity.update(data=identity.data)
-
-
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 
 class OAuth2LoginView(PipelineView):
