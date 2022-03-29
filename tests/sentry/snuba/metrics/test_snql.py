@@ -108,24 +108,18 @@ class DerivedMetricSnQLTestCase(TestCase):
         alias = "session.crashed_and_abnormal_user"
         arg1_snql = crashed_users(self.metric_ids, alias="session.crashed_user")
         arg2_snql = abnormal_users(self.metric_ids, alias="session.abnormal_user")
-        assert (
-            addition(
-                arg1_snql,
-                arg2_snql,
-                alias=alias,
-            )
-            == Function("plus", [arg1_snql, arg2_snql], alias=alias)
-        )
+        assert addition(
+            arg1_snql,
+            arg2_snql,
+            alias=alias,
+        ) == Function("plus", [arg1_snql, arg2_snql], alias=alias)
 
     def test_subtraction_in_snql(self):
         arg1_snql = all_users(self.metric_ids, alias="session.all_user")
         arg2_snql = errored_all_users(self.metric_ids, alias="session.errored_user_all")
 
-        assert (
-            subtraction(
-                arg1_snql,
-                arg2_snql,
-                alias="session.healthy_user",
-            )
-            == Function("minus", [arg1_snql, arg2_snql], alias="session.healthy_user")
-        )
+        assert subtraction(
+            arg1_snql,
+            arg2_snql,
+            alias="session.healthy_user",
+        ) == Function("minus", [arg1_snql, arg2_snql], alias="session.healthy_user")

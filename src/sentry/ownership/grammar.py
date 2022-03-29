@@ -24,7 +24,7 @@ CODEOWNERS = "codeowners"
 
 # Grammar is defined in EBNF syntax.
 ownership_grammar = Grammar(
-    fr"""
+    rf"""
 
 ownership = line+
 
