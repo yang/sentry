@@ -36,7 +36,13 @@ export type ParsedFunction = {
   name: string;
 };
 
-type ValidateColumnValueFunction = ({name: string, dataType: ColumnType}) => boolean;
+type ValidateColumnValueFunction = ({
+  name,
+  dataType,
+}: {
+  dataType: ColumnType | MetricsType;
+  name: string;
+}) => boolean;
 
 export type ValidateColumnTypes =
   | ColumnType[]
@@ -1133,7 +1139,13 @@ export function aggregateMultiPlotType(field: string): PlotType {
 function validateForNumericAggregate(
   validColumnTypes: ColumnType[]
 ): ValidateColumnValueFunction {
-  return function ({name, dataType}: {dataType: ColumnType; name: string}): boolean {
+  return function ({
+    name,
+    dataType,
+  }: {
+    dataType: ColumnType | MetricsType;
+    name: string;
+  }): boolean {
     // these built-in columns cannot be applied to numeric aggregates such as percentile(...)
     if (
       [
@@ -1146,7 +1158,7 @@ function validateForNumericAggregate(
       return false;
     }
 
-    return validColumnTypes.includes(dataType);
+    return validColumnTypes.includes(dataType as ColumnType);
   };
 }
 
@@ -1154,8 +1166,16 @@ function validateDenyListColumns(
   validColumnTypes: ColumnType[],
   deniedColumns: string[]
 ): ValidateColumnValueFunction {
-  return function ({name, dataType}: {dataType: ColumnType; name: string}): boolean {
-    return validColumnTypes.includes(dataType) && !deniedColumns.includes(name);
+  return function ({
+    name,
+    dataType,
+  }: {
+    dataType: ColumnType | MetricsType;
+    name: string;
+  }): boolean {
+    return (
+      validColumnTypes.includes(dataType as ColumnType) && !deniedColumns.includes(name)
+    );
   };
 }
 

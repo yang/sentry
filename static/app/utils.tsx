@@ -42,7 +42,11 @@ export function valueIsEqual(value?: any, other?: any, deep?: boolean): boolean 
   return false;
 }
 
-function objectMatchesSubset(obj?: object, other?: object, deep?: boolean): boolean {
+function objectMatchesSubset(
+  obj?: Record<any, any>,
+  other?: Record<any, any>,
+  deep?: boolean
+): boolean {
   let k: string;
 
   if (obj === other) {
@@ -297,13 +301,14 @@ export function isWebpackChunkLoadingError(error: Error): boolean {
   );
 }
 
-export function deepFreeze<T>(object: T) {
+export function deepFreeze<T extends Record<any, any>>(object: T): Readonly<T> {
   // Retrieve the property names defined on object
   const propNames = Object.getOwnPropertyNames(object);
   // Freeze properties before freezing self
   for (const name of propNames) {
     const value = object[name];
 
+    // @ts-ignore we would need to check that propNames[i] can implement signature of T
     object[name] = value && typeof value === 'object' ? deepFreeze(value) : value;
   }
 

@@ -19,7 +19,7 @@ export function queryToObj(queryStr = ''): QueryObj {
   const text: string[] = [];
 
   const queryItems = queryStr.match(/\S+:"[^"]*"?|\S+/g);
-  const queryObj: QueryObj = (queryItems || []).reduce((obj, item) => {
+  const queryObj: QueryObj = (queryItems || []).reduce<QueryObj>((obj, item) => {
     const index = item.indexOf(':');
     if (index === -1) {
       text.push(item);

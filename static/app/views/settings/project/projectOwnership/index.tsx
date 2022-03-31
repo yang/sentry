@@ -170,7 +170,12 @@ tags.sku_class:enterprise #enterprise`;
     const {project, organization} = this.props;
     const {codeowners} = this.state;
 
-    const errMessageComponent = (message, values, link, linkValue) => (
+    const errMessageComponent = (
+      message: string,
+      values: string[],
+      link: string,
+      linkValue: string
+    ) => (
       <Fragment>
         <ErrorMessageContainer>
           <span>{message}</span>
@@ -212,7 +217,7 @@ tags.sku_class:enterprise #enterprise`;
     return (codeowners || [])
       .filter(({errors}) => Object.values(errors).flat().length)
       .map(({id, codeMapping, errors}) => {
-        const errMessage = (type, values) => {
+        const errMessage = (type: string, values: string[]) => {
           switch (type) {
             case 'missing_external_teams':
               return errMessageComponent(
