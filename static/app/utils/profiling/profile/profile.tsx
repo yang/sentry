@@ -3,6 +3,10 @@ import {lastOfArray} from 'sentry/utils';
 import {CallTreeNode} from '../callTreeNode';
 import {Frame} from '../frame';
 
+type A = never;
+
+// eslint-disable-next-line
+const C: A = [];
 // This is ported from speedscope with a lot of modifications and simplifications
 // head at commit e37f6fa7c38c110205e22081560b99cb89ce885e
 export class Profile {
