@@ -53,7 +53,7 @@ def main():
                 # print(f"Received `None` for one metric, and a value for another. Session: {session_value}, Metric: {metric_value}")
                 continue
 
-            if not isclose(session_value, metric_value, abs_tol=1):
+            if not isclose(session_value, metric_value, abs_tol=5):
                 print("timestamp", timestamp)
                 print(
                     f"Aggregation value did not match for sessions vs metrics. "
@@ -64,8 +64,8 @@ def main():
                     f"\nsession query: {session_payload['result']['request']['query']}"
                     f"\nmetric query: {metric_payload['result']['request']['query']}"
                 )
-                # print("session payload", session_payload)
-                # print("metric payload", metric_payload)
+                print("session payload", session_payload)
+                print("metric payload", metric_payload)
 
 
 if __name__ == "__main__":
