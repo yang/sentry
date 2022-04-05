@@ -37,14 +37,16 @@ const darken = fill => {
     if (saturation < 5 && lightness > 90) {
       color = color
         .lightness(40 + (100 - lightness))
-        .saturationl(20)
+        .saturationl(18)
         .hue(296);
       /** Very dark colors, mostly lines & background fills  */
-    } else if (lightness < 30) {
+    } else if (lightness < 40) {
+      console.log('1', color.hex());
       color = color.lightness(20 + (100 - lightness)).saturate(1);
+      console.log('2', color.hex());
       /** All else */
     } else {
-      color = color.lightness(6 + (100 - lightness));
+      color = color.lightness(12 + (100 - lightness));
     }
   }
 
@@ -55,7 +57,7 @@ export const After = () => {
   const wrapperRef = useRef();
   useEffect(() => {
     const paths = document
-      .querySelector(`${Wrap}`)
+      .querySelector(`${DarkWrap}`)
       ?.querySelectorAll('path, g, polygon, rect');
     paths?.forEach(path => {
       const fill = path.getAttribute('fill');
@@ -63,17 +65,23 @@ export const After = () => {
         const newFill = darken(fill);
         path.setAttribute('fill', newFill);
       }
+
+      const stroke = path.getAttribute('stroke');
+      if (stroke && stroke !== 'none') {
+        const newstroke = darken(stroke);
+        path.setAttribute('stroke', newstroke);
+      }
     });
   }, []);
 
   return (
-    <Wrap ref={wrapperRef}>
+    <DarkWrap ref={wrapperRef}>
       <PerformanceBackground anchorRef={wrapperRef} />
       <DiscoverBackground anchorRef={wrapperRef} />
       <DashboardsBackground anchorRef={wrapperRef} />
       <DeactivatedMember anchorRef={wrapperRef} />
       <AlertsBackground anchorRef={wrapperRef} />
-    </Wrap>
+    </DarkWrap>
   );
 };
 
@@ -94,4 +102,12 @@ export default {
   },
 };
 
-const Wrap = styled('div')``;
+const Wrap = styled('div')`
+  display: grid;
+  gap: 80px;
+`;
+const DarkWrap = styled('div')`
+  display: grid;
+  gap: 80px;
+  background-color: #241d2a;
+`;
