@@ -139,7 +139,7 @@ addParameters({
         'Getting Started',
         'Changelog',
         'Core',
-        ['Overview', 'Colors', 'Typography'],
+        ['Overview', 'Colors', 'Typography', 'Illustrations', ['Before', 'After']],
         'Assets',
         ['Icons', 'Logo', 'Platforms'],
         'Components',
