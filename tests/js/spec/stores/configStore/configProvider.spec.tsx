@@ -3,15 +3,15 @@ import {Fragment} from 'react';
 import {act, render, screen, userEvent} from 'sentry-test/reactTestingLibrary';
 
 import LegacyConfigStore from 'sentry/stores/configStore';
-import {ConfigProvider} from 'sentry/stores/configStore/configProvider';
-import {useConfig} from 'sentry/stores/configStore/useConfig';
+import {ConfigProvider, useConfigStore} from 'sentry/stores/configStore/configProvider';
 import {useLegacyStore} from 'sentry/stores/useLegacyStore';
 
 const ReactContextSourceComponent = ({children}: {children?: React.ReactNode}) => {
-  const [config] = useConfig();
+  const config = useConfigStore();
+
   return (
     <Fragment>
-      React: {config.dsn}
+      React: {config.state.dsn}
       <div>{children ?? null}</div>
     </Fragment>
   );
@@ -81,7 +81,7 @@ describe('configProvider', () => {
     // an action via reducer dispatch and asserting that it gets updated in a component
     // that uses the legacy store
     function Trigger() {
-      const [_, dispatch] = useConfig();
+      const [_, dispatch] = useConfigStore();
 
       return (
         <button

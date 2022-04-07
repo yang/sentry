@@ -1,34 +1,18 @@
-import React, {useState} from 'react';
+import LegacyConfigStore, {ConfigStoreDefinition} from 'sentry/stores/configStore';
 
-import LegacyConfigStore from 'sentry/stores/configStore';
-import {ConfigContext} from 'sentry/stores/configStore/configContext';
-import {Config} from 'sentry/types';
-import {useEffect} from 'react';
+import {createStoreProvider} from '../providers/createStoreProvider';
 
-interface ConfigProviderProps {
-  children: React.ReactNode;
-  initialValue: Config;
-}
+const actions = {
+  set: LegacyConfigStore.set,
+  updateTheme: LegacyConfigStore.updateTheme,
+};
 
-export function ConfigProvider(props: ConfigProviderProps) {
-  const [signalState, setSignalState] = useState({});
-
-  const dispatch = (updateFn: (store: typeof LegacyConfigStore) => void) => {
-    updateFn(LegacyConfigStore);
-    setSignalState({});
-  };
-
-  useEffect(() => {
-    const listener = LegacyConfigStore.listen(changes => {
-      setSignalState({});
-    }, {});
-
-    return () => listener();
-  }, []);
-
-  return (
-    <ConfigContext.Provider value={[LegacyConfigStore.config, dispatch]}>
-      {props.children}
-    </ConfigContext.Provider>
-  );
-}
+export const [ConfigProvider, useConfigStore] = createStoreProvider<
+  ConfigStoreDefinition['config'],
+  typeof LegacyConfigStore,
+  typeof actions
+>({
+  name: 'ConfigStore',
+  store: LegacyConfigStore,
+  actions,
+});
