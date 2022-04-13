@@ -1,4 +1,4 @@
-import React, {Fragment} from 'react';
+import {Fragment} from 'react';
 import styled from '@emotion/styled';
 
 import ActionButton from 'sentry/components/actions/button';
@@ -6,6 +6,7 @@ import MenuItemActionLink from 'sentry/components/actions/menuItemActionLink';
 import Button from 'sentry/components/button';
 import ButtonBar from 'sentry/components/buttonBar';
 import ConfirmDelete from 'sentry/components/confirmDelete';
+import DropdownButton from 'sentry/components/dropdownButton';
 import DropdownLink from 'sentry/components/dropdownLink';
 import Tooltip from 'sentry/components/tooltip';
 import {IconEllipsis} from 'sentry/icons/iconEllipsis';
@@ -17,23 +18,27 @@ import TextBlock from 'sentry/views/settings/components/text/textBlock';
 type Props = {
   hasAccess: boolean;
   hasFeature: boolean;
+  isDetailsDisabled: boolean;
+  isDetailsExpanded: boolean;
   onDelete: () => void;
   onEdit: () => void;
+  onToggleDetails: () => void;
   repositoryName: string;
   repositoryType: string;
-  disabled?: boolean;
-  syncNowButton?: React.ReactElement;
+  showDetails: boolean;
 };
 
 function Actions({
   repositoryName,
   repositoryType,
-  disabled,
+  isDetailsExpanded,
+  isDetailsDisabled,
+  onToggleDetails,
   onEdit,
   onDelete,
+  showDetails,
   hasFeature,
   hasAccess,
-  syncNowButton,
 }: Props) {
   function renderConfirmDelete(element: React.ReactElement) {
     return (
@@ -79,11 +84,22 @@ function Actions({
     );
   }
 
-  const actionsDisabled = !hasAccess || !hasFeature || disabled;
+  const actionsDisabled = !hasAccess || isDetailsDisabled || !hasFeature;
 
   return (
     <StyledButtonBar gap={1}>
-      {syncNowButton}
+      {showDetails && (
+        <StyledDropdownButton
+          isOpen={isDetailsExpanded}
+          size="small"
+          onClick={isDetailsDisabled ? undefined : onToggleDetails}
+          hideBottomBorder={false}
+          disabled={isDetailsDisabled}
+        >
+          {t('Details')}
+        </StyledDropdownButton>
+      )}
+
       <ButtonTooltip
         title={
           !hasFeature
@@ -159,19 +175,20 @@ const StyledActionButton = styled(ActionButton)`
   height: 32px;
 `;
 
+const StyledDropdownButton = styled(DropdownButton)`
+  border-bottom-right-radius: ${p => p.theme.borderRadius};
+  border-bottom-left-radius: ${p => p.theme.borderRadius};
+`;
+
 const StyledButtonBar = styled(ButtonBar)`
-  gap: ${space(1)};
-
-  grid-column: 2/2;
-  grid-row: 4/4;
-  grid-auto-flow: row;
-  margin-top: ${space(0.5)};
-
   @media (min-width: ${p => p.theme.breakpoints[0]}) {
-    grid-column: 3/3;
-    grid-row: 1/3;
-    grid-auto-flow: column;
-    margin-top: 0;
+    grid-row: 1 / 3;
+  }
+
+  @media (max-width: ${p => p.theme.breakpoints[0]}) {
+    grid-auto-flow: row;
+    gap: ${space(1)};
+    margin-top: ${space(0.5)};
   }
 `;
 
@@ -189,8 +206,7 @@ const ActionBtn = styled(Button)`
 `;
 
 const DropDownWrapper = styled('div')`
-  display: none;
-  @media (min-width: ${p => p.theme.breakpoints[0]}) {
-    display: block;
+  @media (max-width: ${p => p.theme.breakpoints[0]}) {
+    display: none;
   }
 `;
