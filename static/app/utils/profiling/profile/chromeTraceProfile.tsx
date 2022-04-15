@@ -59,8 +59,8 @@ function getNextQueue(
     throw new Error('Profile contains no events');
   }
 
-  const nextBegin = beginQueue[beginQueue.length - 1];
   const nextEnd = endQueue[endQueue.length - 1];
+  const nextBegin = beginQueue[beginQueue.length - 1];
 
   if (!nextEnd) {
     return 'B';
@@ -93,6 +93,9 @@ function buildProfile(
   const beginQueue: Array<ChromeTrace.Event> = [];
   const endQueue: Array<ChromeTrace.Event> = [];
 
+  let beginQueueWritePointer = 0;
+  let endQueueWritePointer = 0;
+
   for (let i = 0; i < timelineEvents.length; i++) {
     const event = timelineEvents[i];
 
@@ -112,19 +115,28 @@ function buildProfile(
     // B, E and X events are pushed to the timeline. We transform all X events into
     // B and E event, so that they can be pushed onto the queue and handled
     if (event.ph === 'B') {
-      beginQueue.push(event);
+      beginQueue[beginQueueWritePointer] = event;
+      beginQueueWritePointer++;
       continue;
     }
 
     if (event.ph === 'E') {
-      endQueue.push(event);
+      endQueue[endQueueWritePointer] = event;
+      endQueueWritePointer++;
       continue;
     }
 
     if (event.ph === 'X') {
       if (typeof event.dur === 'number' || typeof event.tdur === 'number') {
-        beginQueue.push({...event, ph: 'B'});
-        endQueue.push({...event, ph: 'E', ts: event.ts + (event.dur ?? event.tdur ?? 0)});
+        beginQueue[beginQueueWritePointer] = {...event, ph: 'B'};
+        beginQueueWritePointer++;
+
+        endQueue[endQueueWritePointer] = {
+          ...event,
+          ph: 'E',
+          ts: event.ts + (event.dur ?? event.tdur ?? 0),
+        };
+        endQueueWritePointer++;
         continue;
       }
     }

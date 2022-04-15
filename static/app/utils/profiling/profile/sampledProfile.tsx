@@ -52,14 +52,14 @@ export class SampledProfile extends Profile {
     let node = this.appendOrderTree;
     const framesInStack: CallTreeNode[] = [];
 
-    for (const frame of stack) {
+    for (let i = 0; i < stack.length; i++) {
       const last = lastOfArray(node.children);
       // Find common frame between two stacks
-      if (last && !last.isLocked() && last.frame === frame) {
+      if (last && !last.isLocked() && last.frame === stack[i]) {
         node = last;
       } else {
         const parent = node;
-        node = new CallTreeNode(frame, node);
+        node = new CallTreeNode(stack[i], node);
         parent.children.push(node);
       }
 
@@ -88,14 +88,14 @@ export class SampledProfile extends Profile {
     // Lock the stack node, so we make sure we dont mutate it in the future.
     // The samples should be ordered by timestamp when processed so we should never
     // iterate over them again in the future.
-    for (const child of node.children) {
-      child.lock();
+    for (let i = 0; i < node.children.length; i++) {
+      node.children[i].lock();
     }
 
     node.frame.addToSelfWeight(weight);
 
-    for (const stackNode of framesInStack) {
-      stackNode.frame.addToTotalWeight(weight);
+    for (let i = 0; i < framesInStack.length; i++) {
+      framesInStack[i].frame.addToTotalWeight(weight);
     }
 
     // If node is the same as the previous sample, add the weight to the previous sample

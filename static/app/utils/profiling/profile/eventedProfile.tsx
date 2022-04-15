@@ -27,7 +27,8 @@ export class EventedProfile extends Profile {
     // samples is correctly offset by the start value.
     profile.lastValue = Math.max(0, eventedProfile.startValue);
 
-    for (const event of eventedProfile.events) {
+    for (let i = 0; i < eventedProfile.events.length; i++) {
+      const event = eventedProfile.events[i];
       const frame = frameIndex[event.frame];
 
       if (!frame) {
@@ -57,8 +58,8 @@ export class EventedProfile extends Profile {
   addWeightToFrames(weight: number): void {
     const weightDelta = weight - this.lastValue;
 
-    for (const frame of this.stack) {
-      frame.addToTotalWeight(weightDelta);
+    for (let i = 0; i < this.stack.length; i++) {
+      this.stack[i].addToTotalWeight(weightDelta);
     }
 
     const top = lastOfArray(this.stack);
@@ -70,8 +71,8 @@ export class EventedProfile extends Profile {
   addWeightsToNodes(value: number) {
     const delta = value - this.lastValue;
 
-    for (const node of this.appendOrderStack) {
-      node.addToTotalWeight(delta);
+    for (let i = 0; i < this.appendOrderStack.length; i++) {
+      this.appendOrderStack[i].addToTotalWeight(delta);
     }
     const stackTop = lastOfArray(this.appendOrderStack);
 
