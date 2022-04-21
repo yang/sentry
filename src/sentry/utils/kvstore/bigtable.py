@@ -119,10 +119,18 @@ class BigtableKVStorage(KVStorage[str, bytes]):
 
         return self.__decode_row(row)
 
-    def get_many(self, keys: Sequence[str]) -> Iterator[Tuple[str, bytes]]:
+    def get_many(
+        self, keys: Sequence[str] = (), prefixes: Sequence[str] = ()
+    ) -> Iterator[Tuple[str, bytes]]:
+        if not keys and not prefixes:
+            raise ValueError("must provide keys or prefixes")
+
         rows = RowSet()
         for key in keys:
             rows.add_row_key(key)
+
+        for prefix in prefixes:
+            rows.add_row_range_with_prefix(prefix)
 
         for row in self._get_table().read_rows(row_set=rows):
             value = self.__decode_row(row)

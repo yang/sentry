@@ -9,6 +9,7 @@ import pytest
 
 from sentry.replaystore.base import ReplayDataType
 from sentry.replaystore.django.backend import DjangoReplayStore
+from tests.sentry.replaystore.bigtable.tests import get_temporary_bigtable_replaystore
 
 
 @contextmanager
@@ -17,12 +18,12 @@ def nullcontext(returning):
     yield returning
 
 
-@pytest.fixture(params=[pytest.param("django", marks=pytest.mark.django_db)])
+@pytest.fixture(params=["bigtable-real", pytest.param("django", marks=pytest.mark.django_db)])
 def rs(request):
     # backends are returned from context managers to support teardown when required
     backends = {
         # "bigtable-mocked": lambda: nullcontext(MockedBigtableNodeStorage(project="test")),
-        # "bigtable-real": lambda: get_temporary_bigtable_replaystore(),
+        "bigtable-real": lambda: get_temporary_bigtable_replaystore(),
         "django": lambda: nullcontext(DjangoReplayStore()),
     }
 
