@@ -4,11 +4,9 @@ import os
 from datetime import timedelta
 from typing import Any, Dict, List, Tuple
 
-from sentry.replaystore.base import ReplayDataType, ReplayNotFound, ReplayStore
+from sentry.replaystore.base import ReplayNotFound, ReplayStore
 from sentry.utils.kvstore.bigtable import BigtableKVStorage
-from sentry.utils.strings import compress, decompress
-
-# from sentry.utils.kvstore.bigtable import BigtableKVStorage
+from sentry.utils.strings import compress
 
 
 class BigTableReplayStore(ReplayStore):
@@ -43,28 +41,11 @@ class BigTableReplayStore(ReplayStore):
         self.automatic_expiry = automatic_expiry
         self.skip_deletes = automatic_expiry and "_SENTRY_CLEANUP" in os.environ
 
-    def _get_all_events_for_replay(
-        self, key: str
-    ) -> Tuple[str, Dict[Any, Any], List[Dict[Any, Any]], List[Dict[Any, Any]]]:
+    def _get_rows(self, key: str) -> List[Tuple[str, bytes]]:
         data = list(self.store.get_many(prefixes=[key]))
-
         if len(data) == 0:
             raise ReplayNotFound
-        id = data[0][0].split(self.KEY_DELIMETER)[0]
-        events = []
-        recordings = []
-        for row in data:
-            replay_data_type = int(row[0].split(self.KEY_DELIMETER)[1])
-            row_data = row[1]
-
-            if replay_data_type == ReplayDataType.ROOT:
-                root: Dict[Any, Any] = self._decode(decompress(row_data))
-            if replay_data_type == ReplayDataType.EVENT:
-                events.append(self._decode(decompress(row_data)))
-            if replay_data_type == ReplayDataType.RECORDING:
-                recordings.append(self._decode(decompress(row_data)))
-
-        return id, root, events, recordings
+        return data
 
     def _set_bytes(self, key: str, value: bytes) -> None:
         self.store.set(key, compress(value))

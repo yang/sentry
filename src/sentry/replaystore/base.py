@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Tuple
 
 from sentry.utils import json
 from sentry.utils.services import Service
+from sentry.utils.strings import decompress
 
 
 class ReplayNotFound(ValueError):
@@ -49,10 +50,10 @@ class ReplayStore(abc.ABC, local, Service):
 
     def get_replay(self, key: str) -> ReplayContainer | None:
         try:
-            id, root, events, recordings = self._get_all_events_for_replay(key)
+            root, events, recordings = self._get_all_events_for_replay(key)
         except ReplayNotFound:
             return None
-        replay = ReplayContainer(id, root, events, recordings)
+        replay = ReplayContainer(key, root, events, recordings)
         return replay
 
     def set(
@@ -64,14 +65,33 @@ class ReplayStore(abc.ABC, local, Service):
 
         self._set_bytes(key, value)
 
-    @abc.abstractmethod
     def _get_all_events_for_replay(
         self, key: str
-    ) -> Tuple[str, Dict[Any, Any], List[Dict[Any, Any]], List[Dict[Any, Any]]]:
-        raise NotImplementedError()
+    ) -> Tuple[Dict[Any, Any], List[Dict[Any, Any]], List[Dict[Any, Any]]]:
+        data = self._get_rows(key)
+        if len(data) == 0:
+            raise ReplayNotFound
+
+        events = []
+        recordings = []
+        for row in data:
+            row_data = row[1]
+            replay_data_type = self._get_row_type(row[0])
+
+            if replay_data_type == ReplayDataType.ROOT:
+                root: Dict[Any, Any] = self._decode(decompress(row_data))
+            if replay_data_type == ReplayDataType.EVENT:
+                events.append(self._decode(decompress(row_data)))
+            if replay_data_type == ReplayDataType.RECORDING:
+                recordings.append(self._decode(decompress(row_data)))
+
+        return root, events, recordings
+
+    def _get_row_type(self, key: str) -> ReplayDataType:
+        return ReplayDataType(int(key.split(self.KEY_DELIMETER)[1]))
 
     @abc.abstractmethod
-    def _set_bytes(self, key: str, value: bytes) -> None:
+    def _get_rows(self, key: Any) -> List[Tuple[str, bytes]]:
         pass
 
     def _encode(self, value: Dict[Any, Any]) -> bytes:
