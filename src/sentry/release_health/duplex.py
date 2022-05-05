@@ -996,6 +996,11 @@ class DuplexReleaseHealthBackend(ReleaseHealthBackend):
             "query": ComparatorType.Exact,
         }
 
+        if query.raw_orderby:
+            # This is functionality offered only by the metrics_sessions_v2
+            # implementation, do not compare anything
+            schema = ComparatorType.Ignore
+
         should_compare = lambda: _coerce_utc(query.start) > self.metrics_start
 
         organization = self._org_from_id(org_id)
