@@ -57,6 +57,7 @@ export function QueryField({
             fieldOptions={fieldOptions}
             onChange={onChange}
             filterPrimaryOptions={option => option.value.kind !== FieldValueKind.FUNCTION}
+            menuPlacement="auto"
           />
           {canDelete && (
             <Button

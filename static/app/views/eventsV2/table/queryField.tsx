@@ -87,6 +87,7 @@ type Props = {
    * used for the metric alert builder.
    */
   inFieldLabels?: boolean;
+  menuPlacement?: ControlProps['menuPlacement'];
   /**
    * This will be displayed in the select if there are no fields
    */
@@ -432,6 +433,7 @@ class QueryField extends Component<Props> {
       filterAggregateParameters,
       hideParameterSelector,
       skipParameterPlaceholder,
+      menuPlacement,
     } = this.props;
 
     const inputs = parameters.map((descriptor: ParameterDescription, index: number) => {
@@ -456,6 +458,7 @@ class QueryField extends Component<Props> {
             disabled={disabled}
             styles={!inFieldLabels ? this.FieldSelectStyles : undefined}
             components={this.FieldSelectComponents}
+            menuPlacement={menuPlacement}
           />
         );
       }
@@ -513,6 +516,7 @@ class QueryField extends Component<Props> {
             onChange={this.handleDropdownParameterChange(index + 1)}
             inFieldLabel={inFieldLabels ? t('Parameter: ') : undefined}
             disabled={disabled}
+            menuPlacement={menuPlacement}
           />
         );
       }
@@ -589,6 +593,7 @@ class QueryField extends Component<Props> {
       placeholder,
       noFieldsMessage,
       skipParameterPlaceholder,
+      menuPlacement,
     } = this.props;
     const {field, fieldOptions, parameterDescriptions} = this.getFieldData();
 
@@ -605,6 +610,7 @@ class QueryField extends Component<Props> {
       inFieldLabel: inFieldLabels ? t('Function: ') : undefined,
       disabled,
       noOptionsMessage: () => noFieldsMessage,
+      menuPlacement,
     };
     if (takeFocus && field === null) {
       selectProps.autoFocus = true;

@@ -105,6 +105,7 @@ export function SortBySelectors({
           <Measurements>
             {({measurements}) => (
               <QueryField
+                menuPlacement="auto"
                 fieldValue={
                   showCustomEquation
                     ? explodeField({field: CUSTOM_EQUATION_VALUE})
