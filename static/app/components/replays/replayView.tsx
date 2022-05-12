@@ -55,7 +55,7 @@ function ReplayView({isFullscreen, toggleFullscreen}: Props) {
       <HorizontalMouseTracking>
         <PlayerScrubber />
       </HorizontalMouseTracking>
-      <PanelBody withPadding>
+      <PanelBody>
         <ReplayController toggleFullscreen={toggleFullscreen} />
       </PanelBody>
     </PanelNoMargin>

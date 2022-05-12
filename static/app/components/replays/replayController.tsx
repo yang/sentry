@@ -19,27 +19,29 @@ interface Props {
   toggleFullscreen?: () => void;
 }
 
+const BUTTON_SIZE = 'small';
+
 function ReplayPlayPauseBar() {
   const {currentTime, isPlaying, setCurrentTime, togglePlayPause} = useReplayContext();
 
   return (
     <ButtonBar merged>
       <Button
-        size="xsmall"
+        size={BUTTON_SIZE}
         title={t('Go back 10 seconds')}
         icon={<IconRefresh size="sm" />}
         onClick={() => setCurrentTime(currentTime - 10 * SECOND)}
         aria-label={t('Go back 10 seconds')}
       />
       <Button
-        size="xsmall"
+        size={BUTTON_SIZE}
         title={isPlaying ? t('Pause the Replay') : t('Play the Replay')}
         icon={isPlaying ? <IconPause size="sm" /> : <IconPlay size="sm" />}
         onClick={() => togglePlayPause(!isPlaying)}
         aria-label={isPlaying ? t('Pause the Replay') : t('Play the Replay')}
       />
       <Button
-        size="xsmall"
+        size={BUTTON_SIZE}
         title={t('Go forward 10 seconds')}
         icon={<IconClockwise size="sm" />}
         onClick={() => setCurrentTime(currentTime + 10 * SECOND)}
@@ -64,7 +66,7 @@ function ReplayPlaybackSpeed({speedOptions}: {speedOptions: number[]}) {
   return (
     <CompactSelect
       triggerProps={{
-        size: 'xsmall',
+        size: 'small',
         prefix: t('Speed'),
       }}
       value={speed}
@@ -92,26 +94,28 @@ const ReplayControls = ({
       <ReplayPlayPauseBar />
       <ReplayCurrentTime />
 
-      {/* TODO(replay): Need a better icon for the FastForward toggle */}
-      <Button
-        size="xsmall"
-        title={t('Fast-forward idle moments')}
-        aria-label={t('Fast-forward idle moments')}
-        icon={<IconArrow size="sm" direction="right" />}
-        priority={isSkippingInactive ? 'primary' : undefined}
-        onClick={() => toggleSkipInactive(!isSkippingInactive)}
-      />
+      <ButtonBar merged>
+        {/* TODO(replay): Need a better icon for the FastForward toggle */}
+        <Button
+          size={BUTTON_SIZE}
+          title={t('Fast-forward idle moments')}
+          aria-label={t('Fast-forward idle moments')}
+          icon={<IconArrow size="sm" direction="right" />}
+          priority={isSkippingInactive ? 'primary' : undefined}
+          onClick={() => toggleSkipInactive(!isSkippingInactive)}
+        />
 
-      <ReplayPlaybackSpeed speedOptions={speedOptions} />
+        <ReplayPlaybackSpeed speedOptions={speedOptions} />
 
-      <Button
-        size="xsmall"
-        title={isFullscreen ? t('Exit full screen') : t('View in full screen')}
-        aria-label={isFullscreen ? t('Exit full screen') : t('View in full screen')}
-        icon={<IconResize size="sm" />}
-        priority={isFullscreen ? 'primary' : undefined}
-        onClick={toggleFullscreen}
-      />
+        <Button
+          size={BUTTON_SIZE}
+          title={isFullscreen ? t('Exit full screen') : t('View in full screen')}
+          aria-label={isFullscreen ? t('Exit full screen') : t('View in full screen')}
+          icon={<IconResize size="sm" />}
+          priority={isFullscreen ? 'primary' : undefined}
+          onClick={toggleFullscreen}
+        />
+      </ButtonBar>
     </ButtonGrid>
   );
 };
