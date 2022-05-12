@@ -75,6 +75,8 @@ interface EChartMouseEventParam {
   value: number | number[];
 }
 
+export type EChartMouseMoveHandler = EChartEventHandler<EChartMouseEventParam>;
+
 export type EChartMouseOutHandler = EChartEventHandler<EChartMouseEventParam>;
 
 export type EChartMouseOverHandler = EChartEventHandler<EChartMouseEventParam>;

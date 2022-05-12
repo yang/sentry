@@ -34,6 +34,7 @@ import {
   EChartEventHandler,
   EChartFinishedHandler,
   EChartHighlightHandler,
+  EChartMouseMoveHandler,
   EChartMouseOutHandler,
   EChartMouseOverHandler,
   EChartRenderedHandler,
@@ -192,6 +193,7 @@ type Props = {
     selected: Record<string, boolean>;
     type: 'legendselectchanged';
   }>;
+  onMouseMove?: EChartMouseMoveHandler;
   onMouseOut?: EChartMouseOutHandler;
   onMouseOver?: EChartMouseOverHandler;
   onRendered?: EChartRenderedHandler;
@@ -320,6 +322,7 @@ function BaseChartUnwrapped({
   onClick,
   onLegendSelectChanged,
   onHighlight,
+  onMouseMove,
   onMouseOut,
   onMouseOver,
   onDataZoom,
@@ -516,6 +519,7 @@ function BaseChartUnwrapped({
         highlight: (props, instance) => onHighlight?.(props, instance),
         mouseout: (props, instance) => onMouseOut?.(props, instance),
         mouseover: (props, instance) => onMouseOver?.(props, instance),
+        mousemove: (props, instance) => onMouseMove?.(props, instance),
         datazoom: (props, instance) => onDataZoom?.(props, instance),
         restore: (props, instance) => onRestore?.(props, instance),
         finished: (props, instance) => onFinished?.(props, instance),
@@ -527,6 +531,7 @@ function BaseChartUnwrapped({
       onClick,
       onHighlight,
       onLegendSelectChanged,
+      onMouseMove,
       onMouseOut,
       onMouseOver,
       onDataZoom,

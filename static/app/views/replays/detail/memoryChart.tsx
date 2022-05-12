@@ -114,6 +114,9 @@ function MemoryChart({
     // XXX: For area charts, mouse events *only* occurs when interacting with
     // the "line" of the area chart. Mouse events do not fire when interacting
     // with the "area" under the line.
+    onMouseMove: data => {
+      console.log(data);
+    },
     onMouseOver: ({data}) => {
       setCurrentHoverTime((data[0] - startTimestamp) * 1000);
     },
