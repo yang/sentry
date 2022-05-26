@@ -1,12 +1,34 @@
 from typing import Sequence
 
-from sentry.models import Activity
+from sentry.api.serializers import serialize
+from sentry.models import Activity, Commit
 from sentry.testutils import TestCase
 from sentry.types.activity import ActivityType
 from sentry.utils.iterators import chunked
 
 
 class ActivityTest(TestCase):
+    def test_serialize_set_resolve_in_commit_activity_with_release(self):
+        project = self.create_project(name="test_throwaway")
+        group = self.create_group(project)
+        user = self.create_user()
+        release = self.create_release(project=project, user=user)
+        commit = Commit.objects.filter(releasecommit__id=release.id).get()
+
+        Activity.objects.create(
+            project_id=project.id,
+            group=group,
+            type=Activity.SET_RESOLVED_IN_COMMIT,
+            ident=commit.id,
+            user=user,
+            data={"commit": commit.id},
+        )
+
+        act = Activity.objects.get(type=Activity.SET_RESOLVED_IN_COMMIT)
+        serialized = serialize(act)
+
+        assert len(serialized["data"]["commit"]["releases"]) == 1
+
     def test_get_activities_for_group_none(self):
         project = self.create_project(name="test_activities_group")
         group = self.create_group(project)
