@@ -120,8 +120,9 @@ export interface Config {
   features: Set<string>;
   gravatarBaseUrl: string;
   invitesEnabled: boolean;
-
   isAuthenticated: boolean;
+
+  sentryUrl: string | undefined;
   // Maintain isOnPremise key for backcompat (plugins?).
   isOnPremise: boolean;
   isSelfHosted: boolean;
@@ -131,8 +132,9 @@ export interface Config {
    * This comes from django (django.contrib.messages)
    */
   messages: {level: keyof Theme['alert']; message: string}[];
-  needsUpgrade: boolean;
 
+  needsUpgrade: boolean;
+  organizationUrl: string | undefined;
   privacyUrl: string | null;
   sentryConfig: {
     dsn: string;
