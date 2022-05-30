@@ -230,9 +230,19 @@ export type RequestOptions = RequestCallbacks & {
 
 type ClientOptions = {
   /**
+   * The URL prefix to be used for making requests for non-organization endpoints.
+   * This is prefixed before baseUrl.
+   */
+  apiUrl?: string;
+  /**
    * The base URL path to prepend to API request URIs.
    */
   baseUrl?: string;
+  /**
+   * The URL prefix to be used for making requests for organization based endpoints.
+   * This is prefixed before baseUrl.
+   */
+  organizationUrl?: string;
 };
 
 type HandleRequestErrorOptions = {
