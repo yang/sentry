@@ -213,6 +213,10 @@ export type RequestOptions = RequestCallbacks & {
    */
   data?: any;
   /**
+   * Append any headers to the API request.
+   */
+  headers?: Record<string, string>;
+  /**
    * The HTTP method to use when making the API request
    */
   method?: APIRequestMethod;
