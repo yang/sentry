@@ -38,11 +38,11 @@ import {
 
 import {DashboardsMEPContext} from './dashboardsMEPContext';
 
-type RawResult = EventsStats | MultiSeriesEventsStats;
+export type RawResult = EventsStats | MultiSeriesEventsStats;
 
 type SeriesWithOrdering = [order: number, series: Series];
 
-function transformSeries(stats: EventsStats, seriesName: string): Series {
+export function transformSeries(stats: EventsStats, seriesName: string): Series {
   return {
     seriesName,
     data:
