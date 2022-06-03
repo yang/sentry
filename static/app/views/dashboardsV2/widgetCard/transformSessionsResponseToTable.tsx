@@ -53,12 +53,13 @@ export function getDerivedMetrics(groupBy, totals, requestedStatusMetrics) {
 }
 
 export function transformSessionsResponseToTable(
-  response: SessionApiResponse | MetricsApiResponse | null,
-  requestedStatusMetrics: string[],
-  injectedFields: string[]
+  data: SessionApiResponse | MetricsApiResponse | null,
+  _shouldUseEvents?: boolean,
+  requestedStatusMetrics?: string[],
+  injectedFields?: string[]
 ): TableData {
-  const data =
-    response?.groups.map((group, index) => ({
+  const rows =
+    data?.groups.map((group, index) => ({
       id: String(index),
       ...mapDerivedMetricsToFields(group.by),
       // if `sum(session)` or `count_unique(user)` are not
@@ -66,18 +67,18 @@ export function transformSessionsResponseToTable(
       // derived status metrics through the Sessions API,
       // they are injected into the payload and need to be
       // stripped.
-      ...omit(mapDerivedMetricsToFields(group.totals), injectedFields),
+      ...omit(mapDerivedMetricsToFields(group.totals), injectedFields ?? []),
       // if session.status is a groupby, some post processing
       // is needed to calculate the status derived metrics
       // from grouped results of `sum(session)` or `count_unique(user)`
-      ...getDerivedMetrics(group.by, group.totals, requestedStatusMetrics),
+      ...getDerivedMetrics(group.by, group.totals, requestedStatusMetrics ?? []),
     })) ?? [];
 
-  const singleRow = data[0];
+  const singleRow = rows[0];
   // TODO(metrics): these should come from the API in the future
   const meta = {
     ...changeObjectValuesToTypes(omit(singleRow, 'id')),
   };
 
-  return {meta, data};
+  return {meta, data: rows};
 }

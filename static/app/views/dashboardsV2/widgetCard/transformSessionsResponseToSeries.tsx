@@ -3,6 +3,7 @@ import {MetricsApiResponse, SessionApiResponse} from 'sentry/types';
 import {Series} from 'sentry/types/echarts';
 import {defined} from 'sentry/utils';
 
+import {WidgetQuery} from '../types';
 import {DERIVED_STATUS_METRICS_PATTERN} from '../widgetBuilder/releaseWidget/fields';
 
 import {derivedMetricsToField} from './releaseWidgetQueries';
@@ -23,15 +24,16 @@ function getSeriesName(
 
 export function transformSessionsResponseToSeries(
   response: SessionApiResponse | MetricsApiResponse | null,
-  requestedStatusMetrics: string[],
-  injectedFields: string[],
-  queryAlias?: string
+  widgetQuery: WidgetQuery,
+  requestedStatusMetrics?: string[],
+  injectedFields?: string[]
 ): Series[] {
   if (response === null) {
     return [];
   }
 
   const results: Series[] = [];
+  const queryAlias = widgetQuery.name;
 
   if (!response.groups.length) {
     return [
@@ -52,7 +54,7 @@ export function transformSessionsResponseToSeries(
       // derived status metrics through the Sessions API,
       // they are injected into the payload and need to be
       // stripped.
-      if (!!!injectedFields.includes(derivedMetricsToField(field))) {
+      if (injectedFields && !!!injectedFields.includes(derivedMetricsToField(field))) {
         results.push({
           seriesName: getSeriesName(field, group, queryAlias),
           data: response.intervals.map((interval, index) => ({
@@ -65,7 +67,11 @@ export function transformSessionsResponseToSeries(
     // if session.status is a groupby, some post processing
     // is needed to calculate the status derived metrics
     // from grouped results of `sum(session)` or `count_unique(user)`
-    if (requestedStatusMetrics.length && defined(group.by['session.status'])) {
+    if (
+      requestedStatusMetrics &&
+      requestedStatusMetrics.length &&
+      defined(group.by['session.status'])
+    ) {
       requestedStatusMetrics.forEach(status => {
         const result = status.match(DERIVED_STATUS_METRICS_PATTERN);
         if (result) {

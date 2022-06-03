@@ -8,11 +8,12 @@ import GroupStore from 'sentry/stores/groupStore';
 import MemberListStore from 'sentry/stores/memberListStore';
 import {Group, OrganizationSummary, PageFilters} from 'sentry/types';
 import {getUtcDateString} from 'sentry/utils/dates';
-import {TableDataRow} from 'sentry/utils/discover/discoverQuery';
+import {TableData, TableDataRow} from 'sentry/utils/discover/discoverQuery';
 import getDynamicText from 'sentry/utils/getDynamicText';
 import {queryToObj} from 'sentry/utils/stream';
 import {DISCOVER_EXCLUSION_FIELDS, IssueSortOptions} from 'sentry/views/issueList/utils';
 
+import {IssuesDatasetConfigContext} from '../config/datasetConfigContext';
 import {DEFAULT_TABLE_LIMIT, Widget, WidgetQuery} from '../types';
 
 const DEFAULT_SORT = IssueSortOptions.DATE;
@@ -121,10 +122,14 @@ class IssueWidgetQueries extends Component<Props, State> {
     }, undefined),
   ];
 
+  static contextType = IssuesDatasetConfigContext;
+  static context: React.ContextType<typeof IssuesDatasetConfigContext>;
+
   transformTableResults(tableResults: Group[]): TableDataRow[] {
     const {selection, widget} = this.props;
     GroupStore.add(tableResults);
     const transformedTableResults: TableDataRow[] = [];
+
     tableResults.forEach(
       ({
         id,
@@ -205,6 +210,7 @@ class IssueWidgetQueries extends Component<Props, State> {
   async fetchIssuesData() {
     const {selection, api, organization, widget, limit, cursor, onDataFetched} =
       this.props;
+    const {datasetConfig} = this.context;
     this.setState({tableResults: []});
     // Issue Widgets only support single queries
     const query = widget.queries[0];
@@ -240,18 +246,20 @@ class IssueWidgetQueries extends Component<Props, State> {
           ...params,
         },
       });
-      const tableResults = this.transformTableResults(data);
+      const tableResults = datasetConfig
+        ? datasetConfig.transformTable!(data as Group[])
+        : ({data: []} as TableData);
       const totalCount = resp?.getResponseHeader('X-Hits') ?? null;
       const pageLinks = resp?.getResponseHeader('Link') ?? null;
       this.setState({
         loading: false,
         errorMessage: undefined,
-        tableResults,
+        tableResults: tableResults.data,
         totalCount,
         pageLinks,
       });
       onDataFetched?.({
-        issuesResults: tableResults,
+        issuesResults: tableResults.data,
         totalIssuesCount: totalCount ?? undefined,
         pageLinks: pageLinks ?? undefined,
       });

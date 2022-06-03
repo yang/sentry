@@ -5,6 +5,7 @@ describe('transformSessionsResponseToTable', function () {
     expect(
       transformSessionsResponseToTable(
         TestStubs.SessionUserCountByStatusByRelease(),
+        undefined,
         [],
         []
       )
@@ -79,6 +80,7 @@ describe('transformSessionsResponseToTable', function () {
     expect(
       transformSessionsResponseToTable(
         TestStubs.SessionUserCountByStatusByRelease(),
+        undefined,
         ['count_crashed(session)'],
         []
       )
@@ -162,6 +164,7 @@ describe('transformSessionsResponseToTable', function () {
     expect(
       transformSessionsResponseToTable(
         TestStubs.SessionUserCountByStatusByRelease(),
+        undefined,
         ['count_crashed(session)'],
         ['sum(session)']
       )

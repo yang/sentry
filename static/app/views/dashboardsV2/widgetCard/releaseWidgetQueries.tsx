@@ -221,9 +221,9 @@ class ReleaseWidgetQueries extends Component<Props, State> {
           timeseriesResults: prevState.rawResults?.flatMap((rawResult, index) =>
             transformSessionsResponseToSeries(
               rawResult,
+              widget.queries[index],
               derivedStatusFields,
-              injectedFields,
-              widget.queries[index].name
+              injectedFields
             )
           ),
         };
@@ -486,6 +486,7 @@ class ReleaseWidgetQueries extends Component<Props, State> {
           if (includeTotals) {
             const tableData = transformSessionsResponseToTable(
               data,
+              undefined,
               derivedStatusFields,
               injectedFields
             ) as TableDataWithTitle; // Cast so we can add the title.
@@ -500,9 +501,9 @@ class ReleaseWidgetQueries extends Component<Props, State> {
           if (includeSeries) {
             const transformedResult = transformSessionsResponseToSeries(
               data,
+              widget.queries[requestIndex],
               derivedStatusFields,
-              injectedFields,
-              widget.queries[requestIndex].name
+              injectedFields
             );
 
             // When charting timeseriesData on echarts, color association to a timeseries result

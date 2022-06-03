@@ -18,8 +18,14 @@ export const ErrorsAndTransactionsConfig: DatasetConfig<
   TableData | EventsTableData
 > = {
   transformSeries: transformEventsSeriesData,
+  transformTable: transformEventsTableData,
 };
 
+// TODO: Replace widgetQuery arg with queryAlias once we return
+// consistent series formats on events-stats because
+// we shouldn't be relying on the widget query to transform
+// this data. This should ideally be a generic function that
+// knows how to transform the API response.
 function transformEventsSeriesData(
   data: EventsStats | MultiSeriesEventsStats,
   widgetQuery: WidgetQuery
@@ -60,4 +66,22 @@ function transformEventsSeriesData(
   }
 
   return output;
+}
+
+function transformEventsTableData(
+  data: TableData | EventsTableData,
+  shouldUseEvents?: boolean
+): TableData {
+  let tableData = data as TableData;
+
+  // events api uses a different response format so we need to construct tableData differently
+  if (shouldUseEvents) {
+    const fieldsMeta = (data as EventsTableData).meta?.fields;
+    tableData = {
+      ...data,
+      meta: {...fieldsMeta, isMetricsData: data.meta?.isMetricsData},
+    } as TableData;
+  }
+
+  return tableData;
 }
