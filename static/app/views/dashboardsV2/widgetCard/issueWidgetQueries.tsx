@@ -210,7 +210,6 @@ class IssueWidgetQueries extends Component<Props, State> {
   async fetchIssuesData() {
     const {selection, api, organization, widget, limit, cursor, onDataFetched} =
       this.props;
-    const {datasetConfig} = this.context;
     this.setState({tableResults: []});
     // Issue Widgets only support single queries
     const query = widget.queries[0];
@@ -246,8 +245,8 @@ class IssueWidgetQueries extends Component<Props, State> {
           ...params,
         },
       });
-      const tableResults = datasetConfig
-        ? datasetConfig.transformTable!(data as Group[])
+      const tableResults = this.context.datasetConfig
+        ? this.context.datasetConfig.transformTable!(data as Group[])
         : ({data: []} as TableData);
       const totalCount = resp?.getResponseHeader('X-Hits') ?? null;
       const pageLinks = resp?.getResponseHeader('Link') ?? null;

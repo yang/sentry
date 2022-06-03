@@ -53,6 +53,7 @@ function transformTableResults(data: Group[]): TableData {
         transformedTableResult.filteredEvents = filtered?.count;
         transformedTableResult.filteredUsers = filtered?.userCount;
       }
+      transformedTableResults.push(transformedTableResult);
     }
   );
   return {data: transformedTableResults};
