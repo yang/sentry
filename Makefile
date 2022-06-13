@@ -149,7 +149,7 @@ test-tools:
 
 backend-typing:
 	@echo "--> Running Python typing checks"
-	mypy --strict --warn-unreachable --config-file mypy.ini
+	python3 -m tools.mypy_incremental
 	@echo ""
 
 test-symbolicator:
