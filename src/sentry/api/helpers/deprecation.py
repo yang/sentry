@@ -21,6 +21,8 @@ GONE_MESSAGE = {"message": "This API no longer exists."}
 DEPRECATION_HEADER = "X-Sentry-Deprecation-Date"
 SUGGESTED_API_HEADER = "X-Sentry-Replacement-Endpoint"
 
+# TODO(adas): Switch the drop-out-after time period to an option
+DROP_ALL_REQUEST_DATE = timedelta(days=31)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,8 @@ def _should_be_blocked(deprecation_date: datetime, now: datetime, key: str):
     """
     # Will need to check redis if the hour fits into the brownout period
     if now >= deprecation_date:
+        if now >= deprecation_date + DROP_ALL_REQUEST_DATE:
+            return True
         key = "api.deprecation.brownout" if not key else key
 
         # Retrieve any custom schedule saved

@@ -93,6 +93,12 @@ class TestDeprecationDecorator(APITestCase):
         with freeze_time(brownout_end):
             self.assert_allowed_request("GET")
 
+        all_request_dropped_start = test_date + timedelta(days=31)
+        with freeze_time(all_request_dropped_start) as frozen_time:
+            self.assert_denied_request("GET")
+            frozen_time.tick(timedelta(hours=5))
+            self.assert_denied_request("GET")
+
     def test_self_hosted(self):
         settings.SENTRY_SELF_HOSTED = True
         self.assert_not_deprecated("GET")
