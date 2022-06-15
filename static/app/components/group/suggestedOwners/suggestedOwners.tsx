@@ -10,6 +10,8 @@ import {promptIsDismissed} from 'sentry/utils/promptIsDismissed';
 import useCommitters from 'sentry/utils/useCommitters';
 import useOrganization from 'sentry/utils/useOrganization';
 
+import {CodeownersEvents} from '../../../utils/analytics/integrations/codeownersAnalyticsEvents';
+
 import {findMatchedRules, Rules} from './findMatchedRules';
 import {OwnershipRules} from './ownershipRules';
 import {SuggestedAssignees} from './suggestedAssignees';
@@ -92,7 +94,7 @@ class SuggestedOwners extends AsyncComponent<Props, State> {
       if (!isDismissed) {
         // now record the results
         trackIntegrationAnalytics(
-          'integrations.show_code_owners_prompt',
+          CodeownersEvents.SHOW_PROMPT,
           {
             view: 'stacktrace_issue_details',
             project_id: project.id,
@@ -115,7 +117,7 @@ class SuggestedOwners extends AsyncComponent<Props, State> {
     });
 
     this.setState({isDismissed: true}, () =>
-      trackIntegrationAnalytics('integrations.dismissed_code_owners_prompt', {
+      trackIntegrationAnalytics(CodeownersEvents.DISMISS_PROMPT, {
         view: 'stacktrace_issue_details',
         project_id: project.id,
         organization,

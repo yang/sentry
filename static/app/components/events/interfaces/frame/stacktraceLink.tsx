@@ -122,7 +122,7 @@ class StacktraceLink extends AsyncComponent<Props, State> {
       status: 'dismissed',
     });
 
-    trackIntegrationAnalytics('integrations.stacktrace_link_cta_dismissed', {
+    trackIntegrationAnalytics(StacktraceLinkEvents.DISMISS_CTA, {
       view: 'stacktrace_issue_details',
       organization,
     });
@@ -193,7 +193,7 @@ class StacktraceLink extends AsyncComponent<Props, State> {
     const error = this.match.error;
     if (provider) {
       trackIntegrationAnalytics(
-        'integrations.reconfigure_stacktrace_setup',
+        StacktraceLinkEvents.RECONFIGURE_SETUP,
         {
           view: 'stacktrace_issue_details',
           provider: provider.key,
@@ -235,7 +235,7 @@ class StacktraceLink extends AsyncComponent<Props, State> {
                     <a
                       onClick={() => {
                         trackIntegrationAnalytics(
-                          'integrations.stacktrace_start_setup',
+                          StacktraceLinkEvents.START_SETUP,
                           {
                             view: 'stacktrace_issue_details',
                             platform,

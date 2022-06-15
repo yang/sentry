@@ -311,7 +311,7 @@ export type AnalyticsTrackEventV2<K extends keyof AnalyticsEventParameters> = (
      * If no org, pass in null.
      */
     organization: Organization | string | null;
-  },
+  } & AnalyticsEventParameters[K],
   options?: {
     /**
      * An arbitrary function to map the parameters to new parameters

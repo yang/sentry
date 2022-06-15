@@ -21,9 +21,9 @@ type Options = Parameters<Hooks['analytics:track-event-v2']>[1];
 type AnalyticsParams<K extends keyof AnalyticsEventParameters> = Omit<
   AnalyticsEventParameters[K],
   'eventName' | 'eventKey'
-> & {organization: string | null | Organization};
+>;
 
-export default function makeAnalyticsFunction(
+export default function makeAnalyticsFunction<Org extends string | null | Organization>(
   eventKeyToNameMap: Record<keyof AnalyticsEventParameters, string | null>,
   defaultOptions?: Options
 ) {
@@ -35,7 +35,7 @@ export default function makeAnalyticsFunction(
    */
   return <K extends keyof AnalyticsEventParameters>(
     eventKey: K,
-    analyticsParams: AnalyticsParams<K>,
+    analyticsParams: AnalyticsParams<K> & {organization: Org},
     options?: Options
   ) => {
     const params = {

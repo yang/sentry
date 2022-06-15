@@ -28,10 +28,7 @@ import {
   SentryAppInstallation,
 } from 'sentry/types';
 import {Hooks} from 'sentry/types/hooks';
-import {
-  integrationEventMap,
-  IntegrationEventParameters,
-} from 'sentry/utils/analytics/integrations';
+import {integrationEventMap} from 'sentry/utils/analytics/integrations';
 import makeAnalyticsFunction from 'sentry/utils/analytics/makeAnalyticsFunction';
 
 const mapIntegrationParams = analyticsParams => {
@@ -44,12 +41,13 @@ const mapIntegrationParams = analyticsParams => {
   return fullParams;
 };
 
-export const trackIntegrationAnalytics = makeAnalyticsFunction<
-  IntegrationEventParameters,
-  {organization: Organization} // org is required
->(integrationEventMap, {
-  mapValuesFn: mapIntegrationParams,
-});
+export const trackIntegrationAnalytics = makeAnalyticsFunction<Organization>(
+  integrationEventMap,
+  {
+    // org is required
+    mapValuesFn: mapIntegrationParams,
+  }
+);
 
 /**
  * In sentry.io the features list supports rendering plan details. If the hook

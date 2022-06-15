@@ -14,6 +14,7 @@ import {IconClose, IconQuestion} from 'sentry/icons';
 import {t} from 'sentry/locale';
 import space from 'sentry/styles/space';
 import {CodeOwner, Organization, Project} from 'sentry/types';
+import {CodeownersEvents} from 'sentry/utils/analytics/integrations/codeownersAnalyticsEvents';
 import {trackIntegrationAnalytics} from 'sentry/utils/integrationUtil';
 
 import SidebarSection from '../sidebarSection';
@@ -35,7 +36,7 @@ const CodeOwnersCTA = HookOrDefault({
       priority="primary"
       to={`/settings/${organization.slug}/projects/${project.slug}/ownership/`}
       onClick={() =>
-        trackIntegrationAnalytics('integrations.code_owners_cta_setup_clicked', {
+        trackIntegrationAnalytics(CodeownersEvents.SETUP_CTA, {
           view: 'stacktrace_issue_details',
           project_id: project.id,
           organization,
@@ -101,7 +102,7 @@ const OwnershipRules = ({
           external
           href="https://docs.sentry.io/product/issues/issue-owners/#code-owners"
           onClick={() =>
-            trackIntegrationAnalytics('integrations.code_owners_cta_docs_clicked', {
+            trackIntegrationAnalytics(CodeownersEvents.DOCS_CTA, {
               view: 'stacktrace_issue_details',
               project_id: project.id,
               organization,

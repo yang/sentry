@@ -12,6 +12,7 @@ import {
   Repository,
   RepositoryProjectPathConfig,
 } from 'sentry/types';
+import {StacktraceLinkEvents} from 'sentry/utils/analytics/integrations/stacktraceLinkAnalyticsEvents';
 import {trackIntegrationAnalytics} from 'sentry/utils/integrationUtil';
 
 type Props = {
@@ -93,7 +94,7 @@ export default class RepositoryProjectPathConfigForm extends Component<Props> {
   }
 
   handlePreSubmit() {
-    trackIntegrationAnalytics('integrations.stacktrace_submit_config', {
+    trackIntegrationAnalytics(StacktraceLinkEvents.SUBMIT, {
       setup_type: 'manual',
       view: 'integration_configuration_detail',
       provider: this.props.integration.provider.key,

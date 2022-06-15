@@ -1,3 +1,8 @@
+import {
+  integrationEventMap,
+  IntegrationEventParameters,
+} from 'sentry/utils/analytics/integrations';
+
 import {coreUIEventMap, CoreUIEventParameters} from './coreuiAnalyticsEvents';
 import {dashboardsEventMap, DashboardsEventParameters} from './dashboardsAnalyticsEvents';
 import {discoverEventMap, DiscoverEventParameters} from './discoverAnalyticsEvents';
@@ -19,6 +24,7 @@ export interface AnalyticsEventParameters
     DashboardsEventParameters,
     DiscoverEventParameters,
     IssueEventParameters,
+    IntegrationEventParameters,
     PerformanceEventParameters,
     SearchEventParameters,
     SettingsEventParameters,
@@ -31,6 +37,7 @@ const allEventMap: Record<keyof AnalyticsEventParameters, string | null> = {
   ...discoverEventMap,
   ...growthEventMap,
   ...issueEventMap,
+  ...integrationEventMap,
   ...performanceEventMap,
   ...dashboardsEventMap,
   ...discoverEventMap,
