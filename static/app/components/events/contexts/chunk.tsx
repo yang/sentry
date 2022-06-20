@@ -98,6 +98,8 @@ class Chunk extends Component<Props, State> {
         return t('Runtime');
       case 'trace':
         return t('Trace Details');
+      case 'performance_issue':
+        return t('Performance Issue Details');
       case 'default':
         if (alias === 'state') {
           return t('Application State');

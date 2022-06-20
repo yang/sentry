@@ -399,6 +399,9 @@ register("relay.project-config-v3-enable", default=0.0)
 # of SaaS (last_seen is a marker for deleting stale customer data)
 register("sentry-metrics.last-seen-updater.accept-rate", default=0.0)
 
+# Experiment to test performance issue creation in the sdk
+register("sdk-experiment.performance-issue-creation", default=0.0)
+
 # default brownout crontab for api deprecations
 register("api.deprecation.brownout-cron", default="0 12 * * *", type=String)
 # Brownout duration to be stored in ISO8601 format for durations (See https://en.wikipedia.org/wiki/ISO_8601#Durations)

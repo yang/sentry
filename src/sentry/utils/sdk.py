@@ -1,5 +1,6 @@
 import copy
 import inspect
+import random
 
 import sentry_sdk
 from django.conf import settings
@@ -258,6 +259,19 @@ def configure_sdk():
         f"backend@{sdk_options['release']}" if "release" in sdk_options else None
     )
     sdk_options["send_client_reports"] = True
+
+    if "_experiments" not in sdk_options:
+        sdk_options["_experiments"] = {}
+
+    if options.get("sdk-experiment.performance-issue-creation"):
+        perf_issue_rate = options.get("sdk-experiment.performance-issue-creation")
+        enabled = perf_issue_rate > random.random()
+
+        if enabled:
+            sdk_options["_experiments"]["performance_issue_creation"] = {
+                "count": 10,
+                "cumulative_time": 500,
+            }
 
     if upstream_dsn:
         transport = make_transport(get_options(dsn=upstream_dsn, **sdk_options))

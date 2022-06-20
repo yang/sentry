@@ -330,50 +330,63 @@ def timeseries_query(
     time bucket. Requires that we only pass
     allow_metric_aggregates (bool) Ignored here, only used in metric enhanced performance
     """
-    with sentry_sdk.start_span(op="discover.discover", description="timeseries.filter_transform"):
-        equations, columns = categorize_columns(selected_columns)
-        base_builder = TimeseriesQueryBuilder(
-            Dataset.Discover,
-            params,
-            rollup,
-            query=query,
-            selected_columns=columns,
-            equations=equations,
-            functions_acl=functions_acl,
-        )
-        query_list = [base_builder]
-        if comparison_delta:
-            if len(base_builder.aggregates) != 1:
-                raise InvalidSearchQuery("Only one column can be selected for comparison queries")
-            comp_query_params = deepcopy(params)
-            comp_query_params["start"] -= comparison_delta
-            comp_query_params["end"] -= comparison_delta
-            comparison_builder = TimeseriesQueryBuilder(
+
+    repeated_times_for_experiment = 11 if referrer == "api.organization-event-stats" else 1
+    sentry_sdk.set_tag("fake_repeats", repeated_times_for_experiment)
+
+    for i in range(repeated_times_for_experiment):
+        with sentry_sdk.start_span(
+            op="discover.discover", description="timeseries.filter_transform"
+        ):
+            equations, columns = categorize_columns(selected_columns)
+            base_builder = TimeseriesQueryBuilder(
                 Dataset.Discover,
-                comp_query_params,
+                params,
                 rollup,
                 query=query,
                 selected_columns=columns,
                 equations=equations,
+                functions_acl=functions_acl,
             )
-            query_list.append(comparison_builder)
-
-        query_results = bulk_snql_query([query.get_snql_query() for query in query_list], referrer)
-
-    with sentry_sdk.start_span(op="discover.discover", description="timeseries.transform_results"):
-        results = []
-        for snql_query, result in zip(query_list, query_results):
-            results.append(
-                zerofill(
-                    result["data"],
-                    snql_query.params["start"],
-                    snql_query.params["end"],
+            query_list = [base_builder]
+            if comparison_delta:
+                if len(base_builder.aggregates) != 1:
+                    raise InvalidSearchQuery(
+                        "Only one column can be selected for comparison queries"
+                    )
+                comp_query_params = deepcopy(params)
+                comp_query_params["start"] -= comparison_delta
+                comp_query_params["end"] -= comparison_delta
+                comparison_builder = TimeseriesQueryBuilder(
+                    Dataset.Discover,
+                    comp_query_params,
                     rollup,
-                    "time",
+                    query=query,
+                    selected_columns=columns,
+                    equations=equations,
                 )
-                if zerofill_results
-                else result["data"]
+                query_list.append(comparison_builder)
+
+            query_results = bulk_snql_query(
+                [query.get_snql_query() for query in query_list], referrer
             )
+
+        with sentry_sdk.start_span(
+            op="discover.discover", description="timeseries.transform_results"
+        ):
+            results = []
+            for snql_query, result in zip(query_list, query_results):
+                results.append(
+                    zerofill(
+                        result["data"],
+                        snql_query.params["start"],
+                        snql_query.params["end"],
+                        rollup,
+                        "time",
+                    )
+                    if zerofill_results
+                    else result["data"]
+                )
 
     if len(results) == 2 and comparison_delta:
         col_name = base_builder.aggregates[0].alias
