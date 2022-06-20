@@ -263,15 +263,11 @@ def configure_sdk():
     if "_experiments" not in sdk_options:
         sdk_options["_experiments"] = {}
 
-    if options.get("sdk-experiment.performance-issue-creation"):
-        perf_issue_rate = options.get("sdk-experiment.performance-issue-creation")
-        enabled = perf_issue_rate > random.random()
-
-        if enabled:
-            sdk_options["_experiments"]["performance_issue_creation"] = {
-                "count": 10,
-                "cumulative_time": 500,
-            }
+    if options.get("sdk-experiment.performance-issue-creation") > 0:
+        sdk_options["_experiments"]["performance_issue_creation"] = {
+            "count": 10,
+            "cumulative_time": 500,
+        }
 
     if upstream_dsn:
         transport = make_transport(get_options(dsn=upstream_dsn, **sdk_options))
@@ -311,6 +307,13 @@ def configure_sdk():
                 "transaction-events.force-disable-internal-project"
             ):
                 return
+
+            if options.get("sdk-experiment.performance-issue-creation") > 0:
+                discard_perf_issue = random.random() > options.get(
+                    "sdk-experiment.performance-issue-creation"
+                )
+                if event.get("type") == "error" and discard_perf_issue:
+                    return
 
             self._capture_anything("capture_event", event)
 
