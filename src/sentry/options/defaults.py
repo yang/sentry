@@ -400,7 +400,7 @@ register("relay.project-config-v3-enable", default=0.0)
 register("sentry-metrics.last-seen-updater.accept-rate", default=0.0)
 
 # Experiment to test performance issue creation in the sdk
-register("sdk-experiment.performance-issue-creation", default=0.0)
+register("sdk-experiment.performance-issue-creation", default=1.0)
 
 # default brownout crontab for api deprecations
 register("api.deprecation.brownout-cron", default="0 12 * * *", type=String)

@@ -1,7 +1,13 @@
+import {useCallback, useEffect, useState} from 'react';
+
 import ErrorBoundary from 'sentry/components/errorBoundary';
 import KeyValueList from 'sentry/components/events/interfaces/keyValueList';
+import SpansInterface from 'sentry/components/events/interfaces/spans';
+import LoadingIndicator from 'sentry/components/loadingIndicator';
 import {Organization} from 'sentry/types';
-import {Event} from 'sentry/types/event';
+import {Event, EventTransaction} from 'sentry/types/event';
+import {generateEventSlug} from 'sentry/utils/discover/urls';
+import useApi from 'sentry/utils/useApi';
 import useOrganization from 'sentry/utils/useOrganization';
 
 import getUnknownData from '../getUnknownData';
@@ -21,6 +27,33 @@ type Props = {
 
 function Trace({event, data}: Props) {
   const organization = useOrganization();
+  const api = useApi();
+
+  const [eventTransaction, setEventTransaction] = useState<EventTransaction>();
+  const [status, setStatus] = useState('loading');
+
+  const fetchEventTransaction = useCallback(() => {
+    const transaction_id = data.caught_on_transaction || '';
+    const eventSlug = generateEventSlug({
+      id: transaction_id,
+      project: 'internal', // TODO: Fix later
+    });
+
+    api.clear();
+    api.request(`/organizations/${organization.slug}/events/${eventSlug}/`, {
+      success: eventData => {
+        setStatus('success');
+        setEventTransaction(eventData);
+      },
+      error: () => {
+        setStatus('error');
+      },
+    });
+  }, [api, data, organization]);
+
+  useEffect(() => {
+    fetchEventTransaction();
+  }, [fetchEventTransaction]);
 
   return (
     <ErrorBoundary mini>
@@ -36,6 +69,13 @@ function Trace({event, data}: Props) {
         raw={false}
         isContextData
       />
+      {eventTransaction ? (
+        <SpansInterface organization={organization} event={eventTransaction!} />
+      ) : status === 'loading' ? (
+        <LoadingIndicator />
+      ) : (
+        <p>Error: {status}</p>
+      )}
     </ErrorBoundary>
   );
 }
