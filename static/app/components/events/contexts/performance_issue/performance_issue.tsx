@@ -55,6 +55,18 @@ function Trace({event, data}: Props) {
     fetchEventTransaction();
   }, [fetchEventTransaction]);
 
+  const traceUnknownData = getUnknownData(data, [
+    ...traceKnownDataValues,
+    ...traceIgnoredDataValues,
+  ]);
+
+  let focusedSpanIds;
+  traceUnknownData.forEach(d => {
+    if (d.key === 'spans') {
+      focusedSpanIds = new Set(d.value as string[]);
+    }
+  });
+
   return (
     <ErrorBoundary mini>
       <KeyValueList
@@ -63,14 +75,13 @@ function Trace({event, data}: Props) {
         raw={false}
         isContextData
       />
-      <KeyValueList
-        data={getUnknownData(data, [...traceKnownDataValues, ...traceIgnoredDataValues])}
-        isSorted={false}
-        raw={false}
-        isContextData
-      />
+      <KeyValueList data={traceUnknownData} isSorted={false} raw={false} isContextData />
       {eventTransaction ? (
-        <SpansInterface organization={organization} event={eventTransaction!} />
+        <SpansInterface
+          organization={organization}
+          event={eventTransaction!}
+          focusedSpanIds={focusedSpanIds}
+        />
       ) : status === 'loading' ? (
         <LoadingIndicator />
       ) : (

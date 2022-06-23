@@ -200,6 +200,7 @@ class SpanTreeModel {
     spanNestedGrouping: EnhancedSpan[] | undefined;
     toggleNestedSpanGroup: (() => void) | undefined;
     treeDepth: number;
+    focusedSpanIds?: Set<string>;
   }): EnhancedProcessedSpanType[] => {
     const {
       operationNameFilters,
@@ -217,6 +218,7 @@ class SpanTreeModel {
       isNestedSpanGroupExpanded,
       addTraceBounds,
       removeTraceBounds,
+      focusedSpanIds,
     } = props;
     let {treeDepth, continuingTreeDepths} = props;
 
@@ -419,6 +421,7 @@ class SpanTreeModel {
                   : false,
                 addTraceBounds,
                 removeTraceBounds,
+                focusedSpanIds,
               })
             );
 
@@ -439,7 +442,10 @@ class SpanTreeModel {
           // This check is needed here, since it is possible that a user could be filtering for a specific span ID.
           // In this case, we must add only the specified span into the accumulator's descendants
           group.forEach((spanModel, index) => {
-            if (this.isSpanFilteredOut(props, spanModel)) {
+            if (
+              this.isSpanFilteredOut(props, spanModel) ||
+              (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
+            ) {
               acc.descendants.push({
                 type: 'filtered_out',
                 span: spanModel.span,
@@ -480,7 +486,10 @@ class SpanTreeModel {
         // Since we are not recursively traversing elements in this group, need to check
         // if the spans are filtered or out of bounds here
 
-        if (this.isSpanFilteredOut(props, group[0])) {
+        if (
+          this.isSpanFilteredOut(props, group[0]) ||
+          (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
+        ) {
           group.forEach(spanModel =>
             acc.descendants.push({
               type: 'filtered_out',
@@ -555,7 +564,10 @@ class SpanTreeModel {
       }
     ).descendants;
 
-    if (this.isSpanFilteredOut(props, this)) {
+    if (
+      this.isSpanFilteredOut(props, this) ||
+      (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
+    ) {
       return [
         {
           type: 'filtered_out',

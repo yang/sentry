@@ -25,6 +25,7 @@ class WaterfallModel {
   rootSpan: SpanTreeModel;
   parsedTrace: ParsedTraceType;
   fuse: Fuse<IndexedFusedSpan> | undefined = undefined;
+  focusedSpanIds?: Set<string>;
 
   // readable/writable state
   operationNameFilters: ActiveOperationFilter = noFilter;
@@ -33,7 +34,7 @@ class WaterfallModel {
   hiddenSpanSubTrees: Set<string>;
   traceBounds: Array<TraceBound>;
 
-  constructor(event: Readonly<EventTransaction>) {
+  constructor(event: Readonly<EventTransaction>, focusedSpanIds?: Set<string>) {
     this.event = event;
 
     this.parsedTrace = parseTrace(event);
@@ -54,6 +55,9 @@ class WaterfallModel {
     // Set of span IDs whose sub-trees should be hidden. This is used for the
     // span tree toggling product feature.
     this.hiddenSpanSubTrees = new Set();
+
+    // When viewing the span waterfall from a Performance Issue, a set of span IDs may be provided
+    this.focusedSpanIds = focusedSpanIds;
 
     makeObservable(this, {
       parsedTrace: observable,
@@ -295,6 +299,7 @@ class WaterfallModel {
       hiddenSpanSubTrees: this.hiddenSpanSubTrees,
       spanAncestors: new Set(),
       filterSpans: this.filterSpans,
+      focusedSpanIds: this.focusedSpanIds,
       previousSiblingEndTimestamp: undefined,
       event: this.event,
       isOnlySibling: true,

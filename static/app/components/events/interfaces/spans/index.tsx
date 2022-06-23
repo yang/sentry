@@ -29,6 +29,7 @@ import WaterfallModel from './waterfallModel';
 type Props = {
   event: EventTransaction;
   organization: Organization;
+  focusedSpanIds?: Set<string>;
 } & WithRouterProps;
 
 type State = {
@@ -39,7 +40,7 @@ type State = {
 class SpansInterface extends PureComponent<Props, State> {
   state: State = {
     parsedTrace: parseTrace(this.props.event),
-    waterfallModel: new WaterfallModel(this.props.event),
+    waterfallModel: new WaterfallModel(this.props.event, this.props.focusedSpanIds),
   };
 
   static getDerivedStateFromProps(props: Readonly<Props>, state: State): State {
@@ -50,7 +51,7 @@ class SpansInterface extends PureComponent<Props, State> {
     return {
       ...state,
       parsedTrace: parseTrace(props.event),
-      waterfallModel: new WaterfallModel(props.event),
+      waterfallModel: new WaterfallModel(props.event, props.focusedSpanIds),
     };
   }
 
