@@ -21,6 +21,7 @@ import withOrganization from 'sentry/utils/withOrganization';
 
 import * as AnchorLinkManager from './anchorLinkManager';
 import Filter from './filter';
+import SpanTreeModel from './spanTreeModel';
 import TraceView from './traceView';
 import {ParsedTraceType} from './types';
 import {parseTrace, scrollToSpan} from './utils';
@@ -29,7 +30,7 @@ import WaterfallModel from './waterfallModel';
 type Props = {
   event: EventTransaction;
   organization: Organization;
-  focusedSpanIds?: Set<string>;
+  focusedSpanIds?: Record<string, SpanTreeModel[]>;
 } & WithRouterProps;
 
 type State = {

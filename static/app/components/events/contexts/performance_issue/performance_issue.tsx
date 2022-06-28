@@ -10,6 +10,7 @@ import {generateEventSlug} from 'sentry/utils/discover/urls';
 import useApi from 'sentry/utils/useApi';
 import useOrganization from 'sentry/utils/useOrganization';
 
+import SpanTreeModel from '../../interfaces/spans/spanTreeModel';
 import getUnknownData from '../getUnknownData';
 
 import getTraceKnownData from './getTraceKnownData';
@@ -60,10 +61,11 @@ function Trace({event, data}: Props) {
     ...traceIgnoredDataValues,
   ]);
 
-  let focusedSpanIds;
+  const focusedSpanIds: Record<string, SpanTreeModel[]> = {};
   traceUnknownData.forEach(d => {
     if (d.key === 'spans') {
-      focusedSpanIds = new Set(d.value as string[]);
+      const spanIds: string[] = d.value as string[];
+      spanIds.forEach(spanId => (focusedSpanIds[spanId] = []));
     }
   });
 

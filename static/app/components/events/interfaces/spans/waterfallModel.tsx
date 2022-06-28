@@ -25,7 +25,7 @@ class WaterfallModel {
   rootSpan: SpanTreeModel;
   parsedTrace: ParsedTraceType;
   fuse: Fuse<IndexedFusedSpan> | undefined = undefined;
-  focusedSpanIds?: Set<string>;
+  focusedSpanIds?: Record<string, SpanTreeModel[]>;
 
   // readable/writable state
   operationNameFilters: ActiveOperationFilter = noFilter;
@@ -34,7 +34,10 @@ class WaterfallModel {
   hiddenSpanSubTrees: Set<string>;
   traceBounds: Array<TraceBound>;
 
-  constructor(event: Readonly<EventTransaction>, focusedSpanIds?: Set<string>) {
+  constructor(
+    event: Readonly<EventTransaction>,
+    focusedSpanIds?: Record<string, SpanTreeModel[]>
+  ) {
     this.event = event;
 
     this.parsedTrace = parseTrace(event);

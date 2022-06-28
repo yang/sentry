@@ -56,6 +56,7 @@ type PropType = {
   spans: EnhancedProcessedSpanType[];
   trace: ParsedTraceType;
   virtualScrollBarContainerRef: React.RefObject<HTMLDivElement>;
+  focusedSpanIds?: Set<string>;
 };
 
 type State = {

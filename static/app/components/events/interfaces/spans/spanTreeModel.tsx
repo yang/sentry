@@ -200,7 +200,7 @@ class SpanTreeModel {
     spanNestedGrouping: EnhancedSpan[] | undefined;
     toggleNestedSpanGroup: (() => void) | undefined;
     treeDepth: number;
-    focusedSpanIds?: Set<string>;
+    focusedSpanIds?: Record<string, SpanTreeModel[]>;
   }): EnhancedProcessedSpanType[] => {
     const {
       operationNameFilters,
@@ -444,12 +444,16 @@ class SpanTreeModel {
           group.forEach((spanModel, index) => {
             if (
               this.isSpanFilteredOut(props, spanModel) ||
-              (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
+              (focusedSpanIds && !(this.span.span_id in focusedSpanIds))
             ) {
               acc.descendants.push({
                 type: 'filtered_out',
                 span: spanModel.span,
               });
+
+              if (focusedSpanIds && !(this.span.span_id in focusedSpanIds)) {
+                focusedSpanIds[this.span.span_id].push(spanModel);
+              }
             } else {
               const enhancedSibling: EnhancedSpan = {
                 type: 'span',
@@ -488,7 +492,7 @@ class SpanTreeModel {
 
         if (
           this.isSpanFilteredOut(props, group[0]) ||
-          (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
+          (focusedSpanIds && !(this.span.span_id in focusedSpanIds))
         ) {
           group.forEach(spanModel =>
             acc.descendants.push({
@@ -564,10 +568,17 @@ class SpanTreeModel {
       }
     ).descendants;
 
-    if (
-      this.isSpanFilteredOut(props, this) ||
-      (focusedSpanIds && !focusedSpanIds.has(this.span.span_id))
-    ) {
+    if (focusedSpanIds && focusedSpanIds && !(this.span.span_id in focusedSpanIds)) {
+      return [
+        {
+          type: 'filtered_out',
+          span: this.span,
+        },
+        ...descendants,
+      ];
+    }
+
+    if (this.isSpanFilteredOut(props, this)) {
       return [
         {
           type: 'filtered_out',

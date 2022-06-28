@@ -48,6 +48,7 @@ class TraceView extends PureComponent<Props> {
               viewStart: 0,
               viewEnd: 1,
             })}
+            focusedSpanIds={waterfallModel.focusedSpanIds}
           />
         );
       }}
