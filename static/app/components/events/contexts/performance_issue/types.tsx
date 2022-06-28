@@ -24,3 +24,5 @@ export type TraceKnownData = {
   op?: string;
   times?: string;
 };
+
+export type FocusedSpanIDMap = Record<string, Set<string>>;

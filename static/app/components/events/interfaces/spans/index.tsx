@@ -19,9 +19,10 @@ import * as QuickTraceContext from 'sentry/utils/performance/quickTrace/quickTra
 import {TraceError} from 'sentry/utils/performance/quickTrace/types';
 import withOrganization from 'sentry/utils/withOrganization';
 
+import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
+
 import * as AnchorLinkManager from './anchorLinkManager';
 import Filter from './filter';
-import SpanTreeModel from './spanTreeModel';
 import TraceView from './traceView';
 import {ParsedTraceType} from './types';
 import {parseTrace, scrollToSpan} from './utils';
@@ -30,7 +31,7 @@ import WaterfallModel from './waterfallModel';
 type Props = {
   event: EventTransaction;
   organization: Organization;
-  focusedSpanIds?: Record<string, SpanTreeModel[]>;
+  focusedSpanIds?: FocusedSpanIDMap;
 } & WithRouterProps;
 
 type State = {

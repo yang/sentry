@@ -6,6 +6,8 @@ import {Client} from 'sentry/api';
 import {EventTransaction} from 'sentry/types/event';
 import {createFuzzySearch, Fuse} from 'sentry/utils/fuzzySearch';
 
+import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
+
 import {ActiveOperationFilter, noFilter, toggleAllFilters, toggleFilter} from './filter';
 import SpanTreeModel from './spanTreeModel';
 import {
@@ -25,7 +27,7 @@ class WaterfallModel {
   rootSpan: SpanTreeModel;
   parsedTrace: ParsedTraceType;
   fuse: Fuse<IndexedFusedSpan> | undefined = undefined;
-  focusedSpanIds?: Record<string, SpanTreeModel[]>;
+  focusedSpanIds?: Record<string, Set<string>>;
 
   // readable/writable state
   operationNameFilters: ActiveOperationFilter = noFilter;
@@ -34,10 +36,7 @@ class WaterfallModel {
   hiddenSpanSubTrees: Set<string>;
   traceBounds: Array<TraceBound>;
 
-  constructor(
-    event: Readonly<EventTransaction>,
-    focusedSpanIds?: Record<string, SpanTreeModel[]>
-  ) {
+  constructor(event: Readonly<EventTransaction>, focusedSpanIds?: FocusedSpanIDMap) {
     this.event = event;
 
     this.parsedTrace = parseTrace(event);

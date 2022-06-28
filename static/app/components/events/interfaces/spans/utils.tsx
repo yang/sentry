@@ -844,3 +844,10 @@ export class SpansInViewMap {
     return avgDepth * (TOGGLE_BORDER_BOX / 2) - TOGGLE_BUTTON_MAX_WIDTH / 2;
   }
 }
+
+export function isSpanIdFocused(
+  spanId: string,
+  focusedSpanIds: Record<string, Set<string>> | undefined
+) {
+  return focusedSpanIds && spanId in focusedSpanIds;
+}

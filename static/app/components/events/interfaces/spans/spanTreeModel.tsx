@@ -4,6 +4,8 @@ import {Client} from 'sentry/api';
 import {t} from 'sentry/locale';
 import {EventTransaction} from 'sentry/types/event';
 
+import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
+
 import {ActiveOperationFilter} from './filter';
 import {
   DescendantGroup,
@@ -25,6 +27,7 @@ import {
   getSpanOperation,
   isEventFromBrowserJavaScriptSDK,
   isOrphanSpan,
+  isSpanIdFocused,
   parseTrace,
   SpanBoundsType,
   SpanGeneratedBoundsType,
@@ -200,7 +203,7 @@ class SpanTreeModel {
     spanNestedGrouping: EnhancedSpan[] | undefined;
     toggleNestedSpanGroup: (() => void) | undefined;
     treeDepth: number;
-    focusedSpanIds?: Record<string, SpanTreeModel[]>;
+    focusedSpanIds?: FocusedSpanIDMap;
   }): EnhancedProcessedSpanType[] => {
     const {
       operationNameFilters,
@@ -320,6 +323,11 @@ class SpanTreeModel {
         // If this span is hidden, then all the descendants are hidden as well
         return [];
       }
+    }
+
+    // If this is a focused span, its parent should be in focus as well
+    if (isSpanIdFocused(this.span.span_id, focusedSpanIds)) {
+      focusedSpanIds![this.span.span_id].add(parentSpanID);
     }
 
     const groupedDescendants: DescendantGroup[] = [];
@@ -452,7 +460,7 @@ class SpanTreeModel {
               });
 
               if (focusedSpanIds && !(this.span.span_id in focusedSpanIds)) {
-                focusedSpanIds[this.span.span_id].push(spanModel);
+                focusedSpanIds[this.span.span_id].add(spanModel.span.span_id);
               }
             } else {
               const enhancedSibling: EnhancedSpan = {

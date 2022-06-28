@@ -10,11 +10,10 @@ import {generateEventSlug} from 'sentry/utils/discover/urls';
 import useApi from 'sentry/utils/useApi';
 import useOrganization from 'sentry/utils/useOrganization';
 
-import SpanTreeModel from '../../interfaces/spans/spanTreeModel';
 import getUnknownData from '../getUnknownData';
 
 import getTraceKnownData from './getTraceKnownData';
-import {TraceKnownData} from './types';
+import {FocusedSpanIDMap, TraceKnownData} from './types';
 
 const traceKnownDataValues = ['caught_on_span'];
 
@@ -61,11 +60,11 @@ function Trace({event, data}: Props) {
     ...traceIgnoredDataValues,
   ]);
 
-  const focusedSpanIds: Record<string, SpanTreeModel[]> = {};
+  const focusedSpanIds: FocusedSpanIDMap = {};
   traceUnknownData.forEach(d => {
     if (d.key === 'spans') {
-      const spanIds: string[] = d.value as string[];
-      spanIds.forEach(spanId => (focusedSpanIds[spanId] = []));
+      const spanIds: Set<string> = d.value as Set<string>;
+      spanIds.forEach(spanId => (focusedSpanIds[spanId] = new Set()));
     }
   });
 
