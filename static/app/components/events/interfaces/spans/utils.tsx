@@ -786,7 +786,7 @@ export class SpansInViewMap {
     this.spanDepthsInView = new Map();
     this.treeDepthSum = 0;
     this.length = 0;
-    this.isRootSpanInView = true;
+    this.isRootSpanInView = false;
   }
 
   /**
