@@ -20,6 +20,8 @@ import {Organization} from 'sentry/types';
 import {EventTransaction} from 'sentry/types/event';
 import theme from 'sentry/utils/theme';
 
+import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
+
 import {
   MINIMAP_CONTAINER_HEIGHT,
   MINIMAP_HEIGHT,
@@ -56,7 +58,7 @@ type PropType = {
   spans: EnhancedProcessedSpanType[];
   trace: ParsedTraceType;
   virtualScrollBarContainerRef: React.RefObject<HTMLDivElement>;
-  focusedSpanIds?: Set<string>;
+  focusedSpanIds?: FocusedSpanIDMap;
 };
 
 type State = {

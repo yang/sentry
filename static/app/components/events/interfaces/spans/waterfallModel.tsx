@@ -27,7 +27,7 @@ class WaterfallModel {
   rootSpan: SpanTreeModel;
   parsedTrace: ParsedTraceType;
   fuse: Fuse<IndexedFusedSpan> | undefined = undefined;
-  focusedSpanIds?: Record<string, Set<string>>;
+  focusedSpanIds?: FocusedSpanIDMap;
 
   // readable/writable state
   operationNameFilters: ActiveOperationFilter = noFilter;
@@ -296,6 +296,7 @@ class WaterfallModel {
       operationNameFilters: this.operationNameFilters,
       generateBounds,
       treeDepth: 0,
+      directParent: null,
       isLastSibling: true,
       continuingTreeDepths: [],
       hiddenSpanSubTrees: this.hiddenSpanSubTrees,

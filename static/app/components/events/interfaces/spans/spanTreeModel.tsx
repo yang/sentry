@@ -189,6 +189,7 @@ class SpanTreeModel {
   getSpansList = (props: {
     addTraceBounds: (bounds: TraceBound) => void;
     continuingTreeDepths: Array<TreeDepthType>;
+    directParent: SpanTreeModel | null;
     event: Readonly<EventTransaction>;
     filterSpans: FilterSpans | undefined;
     generateBounds: (bounds: SpanBoundsType) => SpanGeneratedBoundsType;
@@ -222,8 +223,12 @@ class SpanTreeModel {
       addTraceBounds,
       removeTraceBounds,
       focusedSpanIds,
+      directParent,
     } = props;
     let {treeDepth, continuingTreeDepths} = props;
+    if (focusedSpanIds && this.span.span_id in focusedSpanIds) {
+      directParent && focusedSpanIds[this.span.span_id].add(directParent.span.span_id);
+    }
 
     const parentSpanID = getSpanID(this.span);
     const nextSpanAncestors = new Set(spanAncestors);
@@ -323,11 +328,6 @@ class SpanTreeModel {
         // If this span is hidden, then all the descendants are hidden as well
         return [];
       }
-    }
-
-    // If this is a focused span, its parent should be in focus as well
-    if (isSpanIdFocused(this.span.span_id, focusedSpanIds)) {
-      focusedSpanIds![this.span.span_id].add(parentSpanID);
     }
 
     const groupedDescendants: DescendantGroup[] = [];
@@ -430,6 +430,7 @@ class SpanTreeModel {
                 addTraceBounds,
                 removeTraceBounds,
                 focusedSpanIds,
+                directParent: this,
               })
             );
 
@@ -452,16 +453,12 @@ class SpanTreeModel {
           group.forEach((spanModel, index) => {
             if (
               this.isSpanFilteredOut(props, spanModel) ||
-              (focusedSpanIds && !(this.span.span_id in focusedSpanIds))
+              (focusedSpanIds && !isSpanIdFocused(spanModel.span.span_id, focusedSpanIds))
             ) {
               acc.descendants.push({
                 type: 'filtered_out',
                 span: spanModel.span,
               });
-
-              if (focusedSpanIds && !(this.span.span_id in focusedSpanIds)) {
-                focusedSpanIds[this.span.span_id].add(spanModel.span.span_id);
-              }
             } else {
               const enhancedSibling: EnhancedSpan = {
                 type: 'span',
@@ -498,18 +495,17 @@ class SpanTreeModel {
         // Since we are not recursively traversing elements in this group, need to check
         // if the spans are filtered or out of bounds here
 
-        if (
-          this.isSpanFilteredOut(props, group[0]) ||
-          (focusedSpanIds && !(this.span.span_id in focusedSpanIds))
-        ) {
-          group.forEach(spanModel =>
+        if (this.isSpanFilteredOut(props, group[0])) {
+          group.forEach(spanModel => {
             acc.descendants.push({
               type: 'filtered_out',
               span: spanModel.span,
-            })
-          );
+            });
+          });
           return acc;
         }
+
+        // TODO: Check within the group if any of the focusedSpanIDs are present
 
         const bounds = generateBounds({
           startTimestamp: group[0].span.start_timestamp,
@@ -576,17 +572,10 @@ class SpanTreeModel {
       }
     ).descendants;
 
-    if (focusedSpanIds && focusedSpanIds && !(this.span.span_id in focusedSpanIds)) {
-      return [
-        {
-          type: 'filtered_out',
-          span: this.span,
-        },
-        ...descendants,
-      ];
-    }
-
-    if (this.isSpanFilteredOut(props, this)) {
+    if (
+      this.isSpanFilteredOut(props, this) ||
+      (focusedSpanIds && !isSpanIdFocused(this.span.span_id, focusedSpanIds))
+    ) {
       return [
         {
           type: 'filtered_out',

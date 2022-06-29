@@ -16,6 +16,8 @@ import trackAdvancedAnalyticsEvent from 'sentry/utils/analytics/trackAdvancedAna
 import {WEB_VITAL_DETAILS} from 'sentry/utils/performance/vitals/constants';
 import {getPerformanceTransaction} from 'sentry/utils/performanceForSentry';
 
+import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
+
 import {MERGE_LABELS_THRESHOLD_PERCENT} from './constants';
 import {
   EnhancedSpan,
@@ -845,9 +847,9 @@ export class SpansInViewMap {
   }
 }
 
-export function isSpanIdFocused(
-  spanId: string,
-  focusedSpanIds: Record<string, Set<string>> | undefined
-) {
-  return focusedSpanIds && spanId in focusedSpanIds;
+export function isSpanIdFocused(spanId: string, focusedSpanIds: FocusedSpanIDMap) {
+  return (
+    spanId in focusedSpanIds ||
+    Object.values(focusedSpanIds).some(relatedSpans => relatedSpans.has(spanId))
+  );
 }
