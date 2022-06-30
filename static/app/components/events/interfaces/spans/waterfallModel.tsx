@@ -6,12 +6,11 @@ import {Client} from 'sentry/api';
 import {EventTransaction} from 'sentry/types/event';
 import {createFuzzySearch, Fuse} from 'sentry/utils/fuzzySearch';
 
-import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
-
 import {ActiveOperationFilter, noFilter, toggleAllFilters, toggleFilter} from './filter';
 import SpanTreeModel from './spanTreeModel';
 import {
   FilterSpans,
+  FocusedSpanIDMap,
   IndexedFusedSpan,
   ParsedTraceType,
   RawSpanType,

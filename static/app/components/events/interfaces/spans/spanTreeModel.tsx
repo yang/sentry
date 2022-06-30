@@ -4,8 +4,6 @@ import {Client} from 'sentry/api';
 import {t} from 'sentry/locale';
 import {EventTransaction} from 'sentry/types/event';
 
-import {FocusedSpanIDMap} from '../../contexts/performance_issue/types';
-
 import {ActiveOperationFilter} from './filter';
 import {
   DescendantGroup,
@@ -13,6 +11,7 @@ import {
   EnhancedSpan,
   FetchEmbeddedChildrenState,
   FilterSpans,
+  FocusedSpanIDMap,
   OrphanTreeDepth,
   RawSpanType,
   SpanChildrenLookupType,
