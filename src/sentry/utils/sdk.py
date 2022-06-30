@@ -101,8 +101,6 @@ SAMPLED_TASKS = {
     "sentry.tasks.reprocessing2.handle_remaining_events": settings.SENTRY_REPROCESSING_APM_SAMPLING,
     "sentry.tasks.reprocessing2.reprocess_group": settings.SENTRY_REPROCESSING_APM_SAMPLING,
     "sentry.tasks.reprocessing2.finish_reprocessing": settings.SENTRY_REPROCESSING_APM_SAMPLING,
-    # `update_config_cache` is deprecated, leave this sampling until it's removed
-    "sentry.tasks.relay.update_config_cache": settings.SENTRY_RELAY_TASK_APM_SAMPLING,
     "sentry.tasks.relay.build_project_config": settings.SENTRY_RELAY_TASK_APM_SAMPLING,
     "sentry.tasks.relay.invalidate_project_config": settings.SENTRY_RELAY_TASK_APM_SAMPLING,
     "sentry.tasks.reports.prepare_organization_report": 0.1,
@@ -114,6 +112,7 @@ if settings.ADDITIONAL_SAMPLED_TASKS:
 
 
 UNSAFE_TAG = "_unsafe"
+EXPERIMENT_TAG = "_experimental_event"
 
 
 def is_current_event_safe():
@@ -140,6 +139,16 @@ def is_current_event_safe():
     return True
 
 
+def is_current_event_experimental():
+    """
+    Checks if the event was explicitly marked as experimental.
+    """
+    with configure_scope() as scope:
+        if scope._tags.get(EXPERIMENT_TAG):
+            return True
+    return False
+
+
 def mark_scope_as_unsafe():
     """
     Set the unsafe tag on the SDK scope for outgoing crashes and transactions.
@@ -149,6 +158,16 @@ def mark_scope_as_unsafe():
     """
     with configure_scope() as scope:
         scope.set_tag(UNSAFE_TAG, True)
+
+
+def mark_scope_as_experimental():
+    """
+    Set the experimental tag on the SDK scope for outgoing crashes and transactions.
+
+    Marking the scope will cause these crashes and transaction to be sent to a separate experimental dsn.
+    """
+    with configure_scope() as scope:
+        scope.set_tag(EXPERIMENT_TAG, True)
 
 
 def set_current_event_project(project_id):
@@ -252,6 +271,7 @@ def configure_sdk():
     sdk_options = dict(settings.SENTRY_SDK_CONFIG)
 
     relay_dsn = sdk_options.pop("relay_dsn", None)
+    experimental_dsn = sdk_options.pop("experimental_dsn", None)
     internal_project_key = get_project_key()
     upstream_dsn = sdk_options.pop("dsn", None)
     sdk_options["traces_sampler"] = traces_sampler
@@ -259,15 +279,6 @@ def configure_sdk():
         f"backend@{sdk_options['release']}" if "release" in sdk_options else None
     )
     sdk_options["send_client_reports"] = True
-
-    if "_experiments" not in sdk_options:
-        sdk_options["_experiments"] = {}
-
-    if options.get("sdk-experiment.performance-issue-creation") > 0:
-        sdk_options["_experiments"]["performance_issue_creation"] = {
-            "count": 10,
-            "cumulative_time": 500,
-        }
 
     if upstream_dsn:
         transport = make_transport(get_options(dsn=upstream_dsn, **sdk_options))
@@ -285,6 +296,12 @@ def configure_sdk():
         relay_transport = patch_transport_for_instrumentation(transport, "relay")
     else:
         relay_transport = None
+
+    if experimental_dsn:
+        transport = make_transport(get_options(dsn=experimental_dsn, **sdk_options))
+        experimental_transport = patch_transport_for_instrumentation(transport, "experimental")
+    else:
+        experimental_transport = None
 
     class MultiplexingTransport(sentry_sdk.transport.Transport):
         def capture_envelope(self, envelope):
@@ -308,16 +325,17 @@ def configure_sdk():
             ):
                 return
 
-            if options.get("sdk-experiment.performance-issue-creation") > 0:
-                discard_perf_issue = random.random() > options.get(
-                    "sdk-experiment.performance-issue-creation"
-                )
-                if event.get("type") == "error" and discard_perf_issue:
-                    return
-
             self._capture_anything("capture_event", event)
 
         def _capture_anything(self, method_name, *args, **kwargs):
+            # Experimental events will be sent to the experimental transport.
+            if experimental_transport:
+                rate = options.get("store.use-experimental-dsn-sample-rate")
+                if is_current_event_experimental():
+                    if rate and random.random() < rate:
+                        getattr(experimental_transport, method_name)(*args, **kwargs)
+                    # Experimental events should not be sent to other transports even if they are not sampled.
+                    return
 
             # Upstream should get the event first because it is most isolated from
             # the this sentry installation.
