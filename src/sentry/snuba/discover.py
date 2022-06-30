@@ -217,6 +217,7 @@ def query(
     conditions=None,
     functions_acl=None,
     transform_alias_to_input_format=False,
+    sample=None,
 ) -> EventsResponse:
     """
     High-level API for doing arbitrary user queries against events.
@@ -247,6 +248,7 @@ def query(
                     any additional processing.
     transform_alias_to_input_format (bool) Whether aggregate columns should be returned in the originally
                                 requested function format.
+    sample (float) The sample rate to run the query with
     """
     if not selected_columns:
         raise InvalidSearchQuery("No columns selected")
@@ -265,6 +267,7 @@ def query(
         limit=limit,
         offset=offset,
         equation_config={"auto_add": include_equation_fields},
+        sample_rate=sample,
     )
     if conditions is not None:
         builder.add_conditions(conditions)
@@ -330,63 +333,50 @@ def timeseries_query(
     time bucket. Requires that we only pass
     allow_metric_aggregates (bool) Ignored here, only used in metric enhanced performance
     """
-
-    repeated_times_for_experiment = 11 if referrer == "api.organization-event-stats" else 1
-    sentry_sdk.set_tag("fake_repeats", repeated_times_for_experiment)
-
-    for i in range(repeated_times_for_experiment):
-        with sentry_sdk.start_span(
-            op="discover.discover", description="timeseries.filter_transform"
-        ):
-            equations, columns = categorize_columns(selected_columns)
-            base_builder = TimeseriesQueryBuilder(
+    with sentry_sdk.start_span(op="discover.discover", description="timeseries.filter_transform"):
+        equations, columns = categorize_columns(selected_columns)
+        base_builder = TimeseriesQueryBuilder(
+            Dataset.Discover,
+            params,
+            rollup,
+            query=query,
+            selected_columns=columns,
+            equations=equations,
+            functions_acl=functions_acl,
+        )
+        query_list = [base_builder]
+        if comparison_delta:
+            if len(base_builder.aggregates) != 1:
+                raise InvalidSearchQuery("Only one column can be selected for comparison queries")
+            comp_query_params = deepcopy(params)
+            comp_query_params["start"] -= comparison_delta
+            comp_query_params["end"] -= comparison_delta
+            comparison_builder = TimeseriesQueryBuilder(
                 Dataset.Discover,
-                params,
+                comp_query_params,
                 rollup,
                 query=query,
                 selected_columns=columns,
                 equations=equations,
-                functions_acl=functions_acl,
             )
-            query_list = [base_builder]
-            if comparison_delta:
-                if len(base_builder.aggregates) != 1:
-                    raise InvalidSearchQuery(
-                        "Only one column can be selected for comparison queries"
-                    )
-                comp_query_params = deepcopy(params)
-                comp_query_params["start"] -= comparison_delta
-                comp_query_params["end"] -= comparison_delta
-                comparison_builder = TimeseriesQueryBuilder(
-                    Dataset.Discover,
-                    comp_query_params,
+            query_list.append(comparison_builder)
+
+        query_results = bulk_snql_query([query.get_snql_query() for query in query_list], referrer)
+
+    with sentry_sdk.start_span(op="discover.discover", description="timeseries.transform_results"):
+        results = []
+        for snql_query, result in zip(query_list, query_results):
+            results.append(
+                zerofill(
+                    result["data"],
+                    snql_query.params["start"],
+                    snql_query.params["end"],
                     rollup,
-                    query=query,
-                    selected_columns=columns,
-                    equations=equations,
+                    "time",
                 )
-                query_list.append(comparison_builder)
-
-            query_results = bulk_snql_query(
-                [query.get_snql_query() for query in query_list], referrer
+                if zerofill_results
+                else result["data"]
             )
-
-        with sentry_sdk.start_span(
-            op="discover.discover", description="timeseries.transform_results"
-        ):
-            results = []
-            for snql_query, result in zip(query_list, query_results):
-                results.append(
-                    zerofill(
-                        result["data"],
-                        snql_query.params["start"],
-                        snql_query.params["end"],
-                        rollup,
-                        "time",
-                    )
-                    if zerofill_results
-                    else result["data"]
-                )
 
     if len(results) == 2 and comparison_delta:
         col_name = base_builder.aggregates[0].alias
@@ -938,7 +928,7 @@ def get_histogram_column(fields, key_column, histogram_params, array_column):
 def find_histogram_params(num_buckets, min_value, max_value, multiplier):
     """
     Compute the parameters to use for the histogram. Using the provided
-    arguments, ensure that the generated histogram encapsolates the desired range.
+    arguments, ensure that the generated histogram encapsulates the desired range.
 
     :param int num_buckets: The number of buckets the histogram should contain.
     :param float min_value: The minimum value allowed to be in the histogram inclusive.
