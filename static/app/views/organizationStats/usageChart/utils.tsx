@@ -3,8 +3,9 @@ import moment from 'moment';
 import {parseStatsPeriod} from 'sentry/components/organizations/pageFilters/parse';
 import {DataCategory, IntervalPeriod} from 'sentry/types';
 import {parsePeriodToHours} from 'sentry/utils/dates';
+import {formatAbbreviatedNumber} from 'sentry/utils/formatters';
 
-import {formatUsageWithUnits} from '../utils';
+import {formatUsageWithUnits, GIGABYTE} from '../utils';
 
 /**
  * Avoid changing "MMM D" format as X-axis labels on UsageChart are naively
@@ -141,4 +142,18 @@ function getLabelIntervalShortPeriod(dataPeriod: number, numBars: number) {
     xAxisTickInterval: interval - 1,
     xAxisLabelInterval: interval - 1,
   };
+}
+
+export function getYAxisMinInterval(category: string): number {
+  return category === DataCategory.ATTACHMENTS ? 0.5 * GIGABYTE : 100;
+}
+
+export function formatYAxis(quantity: number, category: string): string {
+  if (category === DataCategory.ATTACHMENTS) {
+    return formatUsageWithUnits(quantity, DataCategory.ATTACHMENTS, {
+      isAbbreviated: true,
+      useUnitScaling: true,
+    });
+  }
+  return formatAbbreviatedNumber(quantity);
 }

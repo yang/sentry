@@ -18,13 +18,16 @@ import {t} from 'sentry/locale';
 import space from 'sentry/styles/space';
 import {DataCategory, IntervalPeriod, SelectValue} from 'sentry/types';
 import {parsePeriodToHours, statsPeriodToDays} from 'sentry/utils/dates';
-import {formatAbbreviatedNumber} from 'sentry/utils/formatters';
 import getDynamicText from 'sentry/utils/getDynamicText';
 import commonTheme, {Theme} from 'sentry/utils/theme';
 
-import {formatUsageWithUnits, GIGABYTE} from '../utils';
-
-import {getTooltipFormatter, getXAxisDates, getXAxisLabelInterval} from './utils';
+import {
+  formatYAxis,
+  getTooltipFormatter,
+  getXAxisDates,
+  getXAxisLabelInterval,
+  getYAxisMinInterval,
+} from './utils';
 
 type ChartProps = React.ComponentProps<typeof BaseChart>;
 
@@ -278,31 +281,14 @@ export class UsageChart extends Component<Props, State> {
 
     const {label, value} = selectDataCategory;
 
-    if (value === DataCategory.ERRORS || value === DataCategory.TRANSACTIONS) {
-      return {
-        chartLabel: label,
-        chartData,
-        xAxisData: xAxisDates,
-        xAxisTickInterval,
-        xAxisLabelInterval,
-        yAxisMinInterval: 100,
-        yAxisFormatter: formatAbbreviatedNumber,
-        tooltipValueFormatter: getTooltipFormatter(dataCategory),
-      };
-    }
-
     return {
       chartLabel: label,
       chartData,
       xAxisData: xAxisDates,
       xAxisTickInterval,
       xAxisLabelInterval,
-      yAxisMinInterval: 0.5 * GIGABYTE,
-      yAxisFormatter: (val: number) =>
-        formatUsageWithUnits(val, DataCategory.ATTACHMENTS, {
-          isAbbreviated: true,
-          useUnitScaling: true,
-        }),
+      yAxisMinInterval: getYAxisMinInterval(value),
+      yAxisFormatter: (quantity: number) => formatYAxis(quantity, value),
       tooltipValueFormatter: getTooltipFormatter(dataCategory),
     };
   }
