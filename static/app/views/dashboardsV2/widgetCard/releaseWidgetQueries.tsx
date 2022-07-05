@@ -337,7 +337,7 @@ function ReleaseWidgetQueries({
       onDataFetched={onDataFetched}
       loading={
         requiresCustomReleaseSorting(widget.queries[0])
-          ? releases !== undefined
+          ? releases === undefined
           : undefined
       }
       customDidUpdateComparator={customDidUpdateComparator}
