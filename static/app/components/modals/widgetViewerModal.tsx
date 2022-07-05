@@ -578,11 +578,11 @@ function WidgetViewerModal(props: Props) {
     );
   };
 
-  const renderReleaseTable: ReleaseWidgetQueries['props']['children'] = ({
+  const renderReleaseTable = ({
     tableResults,
     loading,
     pageLinks,
-  }) => {
+  }: GenericWidgetQueriesChildrenProps) => {
     const links = parseLinkHeader(pageLinks ?? null);
     const isFirstPage = links.previous?.results === false;
     return (

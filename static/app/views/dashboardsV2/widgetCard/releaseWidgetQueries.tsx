@@ -1,4 +1,4 @@
-import {Component} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import isEqual from 'lodash/isEqual';
 import omit from 'lodash/omit';
@@ -46,12 +46,6 @@ type Props = {
     tableResults?: TableDataWithTitle[];
     timeseriesResults?: Series[];
   }) => void;
-};
-
-type State = {
-  loading: boolean;
-  errorMessage?: string;
-  releases?: Release[];
 };
 
 export function derivedMetricsToField(field: string): string {
@@ -142,35 +136,74 @@ export function requiresCustomReleaseSorting(query: WidgetQuery): boolean {
   return useMetricsAPI && rawOrderby === 'release';
 }
 
-class ReleaseWidgetQueries extends Component<Props, State> {
-  state: State = {
-    loading: true,
-    errorMessage: undefined,
-    releases: undefined,
-  };
+const customDidUpdateComparator = (
+  prevProps: GenericWidgetQueriesProps<
+    SessionApiResponse | MetricsApiResponse,
+    SessionApiResponse | MetricsApiResponse
+  >,
+  nextProps: GenericWidgetQueriesProps<
+    SessionApiResponse | MetricsApiResponse,
+    SessionApiResponse | MetricsApiResponse
+  >
+) => {
+  const {loading, limit, widget, cursor, organization, selection} = nextProps;
+  const ignoredWidgetProps = ['queries', 'title', 'id', 'layout', 'tempId', 'widgetType'];
+  const ignoredQueryProps = ['name', 'fields', 'aggregates', 'columns'];
+  return (
+    limit !== prevProps.limit ||
+    organization.slug !== prevProps.organization.slug ||
+    !isSelectionEqual(selection, prevProps.selection) ||
+    // If the widget changed (ignore unimportant fields, + queries as they are handled lower)
+    !isEqual(
+      omit(widget, ignoredWidgetProps),
+      omit(prevProps.widget, ignoredWidgetProps)
+    ) ||
+    // If the queries changed (ignore unimportant name, + fields as they are handled lower)
+    !isEqual(
+      widget.queries.map(q => omit(q, ignoredQueryProps)),
+      prevProps.widget.queries.map(q => omit(q, ignoredQueryProps))
+    ) ||
+    // If the fields changed (ignore falsy/empty fields -> they can happen after clicking on Add Overlay)
+    !isEqual(
+      widget.queries.flatMap(q => q.fields?.filter(field => !!field)),
+      prevProps.widget.queries.flatMap(q => q.fields?.filter(field => !!field))
+    ) ||
+    !isEqual(
+      widget.queries.flatMap(q => q.aggregates.filter(aggregate => !!aggregate)),
+      prevProps.widget.queries.flatMap(q => q.aggregates.filter(aggregate => !!aggregate))
+    ) ||
+    !isEqual(
+      widget.queries.flatMap(q => q.columns.filter(column => !!column)),
+      prevProps.widget.queries.flatMap(q => q.columns.filter(column => !!column))
+    ) ||
+    loading !== prevProps.loading ||
+    cursor !== prevProps.cursor
+  );
+};
 
-  componentDidMount() {
-    this._isMounted = true;
-    if (requiresCustomReleaseSorting(this.props.widget.queries[0])) {
-      this.fetchReleases();
-      return;
-    }
-  }
+function ReleaseWidgetQueries({
+  widget,
+  selection,
+  api,
+  organization,
+  limit,
+  children,
+  cursor,
+  onDataFetched,
+}: Props) {
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+  const [releases, setReleases] = useState<Release[] | undefined>(undefined);
+  const [queryFetchID, setQueryFetchID] = useState<Symbol | undefined>(undefined);
 
-  componentWillUnmount() {
-    this._isMounted = false;
-  }
+  const _isMounted = useRef(false);
 
-  config = ReleasesConfig;
-  private _isMounted: boolean = false;
-
-  fetchReleases = async () => {
-    this.setState({loading: true});
-    const {selection, api, organization} = this.props;
+  const fetchReleases = async () => {
     const {environments, projects} = selection;
+    const currQueryFetchID = Symbol('queryFetchID');
+    setQueryFetchID(currQueryFetchID);
 
     try {
-      const releases = await api.requestPromise(
+      const releasesData = await api.requestPromise(
         `/organizations/${organization.slug}/releases/`,
         {
           method: 'GET',
@@ -182,21 +215,35 @@ class ReleaseWidgetQueries extends Component<Props, State> {
           },
         }
       );
-      if (!this._isMounted) {
-        return;
+      if (_isMounted.current && currQueryFetchID === queryFetchID) {
+        setReleases(releasesData);
       }
-      this.setState({releases, loading: false});
     } catch (error) {
-      addErrorMessage(
-        error.responseJSON ? error.responseJSON.error : t('Error sorting by releases')
-      );
+      const message = error.responseJSON
+        ? error.responseJSON.error
+        : t('Error sorting by releases');
+
+      if (_isMounted.current && currQueryFetchID === queryFetchID) {
+        addErrorMessage(message);
+        setErrorMessage(message);
+      }
     }
   };
 
-  get limit() {
-    const {limit} = this.props;
+  useEffect(() => {
+    _isMounted.current = true;
+    if (requiresCustomReleaseSorting(widget.queries[0])) {
+      fetchReleases();
+    }
 
-    switch (this.props.widget.displayType) {
+    return () => {
+      _isMounted.current = false;
+    };
+    // eslint-disable-next-line
+  }, []);
+
+  const getLimit = () => {
+    switch (widget.displayType) {
       case DisplayType.TOP_N:
         return TOP_N;
       case DisplayType.TABLE:
@@ -206,69 +253,16 @@ class ReleaseWidgetQueries extends Component<Props, State> {
       default:
         return limit ?? 20; // TODO(dam): Can be changed to undefined once [INGEST-1079] is resolved
     }
-  }
-
-  customDidUpdateComparator = (
-    prevProps: GenericWidgetQueriesProps<
-      SessionApiResponse | MetricsApiResponse,
-      SessionApiResponse | MetricsApiResponse
-    >,
-    nextProps: GenericWidgetQueriesProps<
-      SessionApiResponse | MetricsApiResponse,
-      SessionApiResponse | MetricsApiResponse
-    >
-  ) => {
-    const {loading, limit, widget, cursor, organization, selection} = nextProps;
-    const ignoredWidgetProps = [
-      'queries',
-      'title',
-      'id',
-      'layout',
-      'tempId',
-      'widgetType',
-    ];
-    const ignoredQueryProps = ['name', 'fields', 'aggregates', 'columns'];
-    return (
-      limit !== prevProps.limit ||
-      organization.slug !== prevProps.organization.slug ||
-      !isSelectionEqual(selection, prevProps.selection) ||
-      // If the widget changed (ignore unimportant fields, + queries as they are handled lower)
-      !isEqual(
-        omit(widget, ignoredWidgetProps),
-        omit(prevProps.widget, ignoredWidgetProps)
-      ) ||
-      // If the queries changed (ignore unimportant name, + fields as they are handled lower)
-      !isEqual(
-        widget.queries.map(q => omit(q, ignoredQueryProps)),
-        prevProps.widget.queries.map(q => omit(q, ignoredQueryProps))
-      ) ||
-      // If the fields changed (ignore falsy/empty fields -> they can happen after clicking on Add Overlay)
-      !isEqual(
-        widget.queries.flatMap(q => q.fields?.filter(field => !!field)),
-        prevProps.widget.queries.flatMap(q => q.fields?.filter(field => !!field))
-      ) ||
-      !isEqual(
-        widget.queries.flatMap(q => q.aggregates.filter(aggregate => !!aggregate)),
-        prevProps.widget.queries.flatMap(q =>
-          q.aggregates.filter(aggregate => !!aggregate)
-        )
-      ) ||
-      !isEqual(
-        widget.queries.flatMap(q => q.columns.filter(column => !!column)),
-        prevProps.widget.queries.flatMap(q => q.columns.filter(column => !!column))
-      ) ||
-      loading !== prevProps.loading ||
-      cursor !== prevProps.cursor
-    );
   };
 
-  transformWidget = (initialWidget: Widget): Widget => {
-    const {releases} = this.state;
-    const widget = cloneDeep(initialWidget);
+  const transformWidget = (initialWidget: Widget): Widget => {
+    const transformedWidget = cloneDeep(initialWidget);
 
-    const isCustomReleaseSorting = requiresCustomReleaseSorting(widget.queries[0]);
-    const isDescending = widget.queries[0].orderby.startsWith('-');
-    const useSessionAPI = widget.queries[0].columns.includes('session.status');
+    const isCustomReleaseSorting = requiresCustomReleaseSorting(
+      transformedWidget.queries[0]
+    );
+    const isDescending = transformedWidget.queries[0].orderby.startsWith('-');
+    const useSessionAPI = transformedWidget.queries[0].columns.includes('session.status');
 
     let releaseCondition = '';
     const releasesArray: string[] = [];
@@ -289,19 +283,16 @@ class ReleaseWidgetQueries extends Component<Props, State> {
     }
 
     if (!useSessionAPI) {
-      widget.queries.forEach(query => {
+      transformedWidget.queries.forEach(query => {
         query.conditions =
           query.conditions + (releaseCondition === '' ? '' : ` ${releaseCondition}`);
       });
     }
 
-    return widget;
+    return transformedWidget;
   };
 
-  afterFetchData = (data: SessionApiResponse | MetricsApiResponse) => {
-    const {widget} = this.props;
-    const {releases} = this.state;
-
+  const afterFetchData = (data: SessionApiResponse | MetricsApiResponse) => {
     const isDescending = widget.queries[0].orderby.startsWith('-');
 
     const releasesArray: string[] = [];
@@ -325,46 +316,42 @@ class ReleaseWidgetQueries extends Component<Props, State> {
         const release2 = group2.by.release;
         return releasesArray.indexOf(release1) - releasesArray.indexOf(release2);
       });
-      data.groups = data.groups.slice(0, this.limit);
+      data.groups = data.groups.slice(0, limit);
     }
   };
 
-  render() {
-    const {api, children, organization, selection, widget, cursor, onDataFetched} =
-      this.props;
-    const config = ReleasesConfig;
+  const config = ReleasesConfig;
 
-    return (
-      <GenericWidgetQueries<
-        SessionApiResponse | MetricsApiResponse,
-        SessionApiResponse | MetricsApiResponse
-      >
-        config={config}
-        api={api}
-        organization={organization}
-        selection={selection}
-        widget={this.transformWidget(widget)}
-        cursor={cursor}
-        limit={this.limit}
-        onDataFetched={onDataFetched}
-        loading={
-          requiresCustomReleaseSorting(widget.queries[0])
-            ? !this.state.releases
-            : undefined
-        }
-        customDidUpdateComparator={this.customDidUpdateComparator}
-        afterFetchTableData={this.afterFetchData}
-        afterFetchSeriesData={this.afterFetchData}
-      >
-        {({errorMessage, ...rest}) =>
-          children({
-            errorMessage: this.state.errorMessage ?? errorMessage,
-            ...rest,
-          })
-        }
-      </GenericWidgetQueries>
-    );
-  }
+  return (
+    <GenericWidgetQueries<
+      SessionApiResponse | MetricsApiResponse,
+      SessionApiResponse | MetricsApiResponse
+    >
+      config={config}
+      api={api}
+      organization={organization}
+      selection={selection}
+      widget={transformWidget(widget)}
+      cursor={cursor}
+      limit={getLimit()}
+      onDataFetched={onDataFetched}
+      loading={
+        requiresCustomReleaseSorting(widget.queries[0])
+          ? releases !== undefined
+          : undefined
+      }
+      customDidUpdateComparator={customDidUpdateComparator}
+      afterFetchTableData={afterFetchData}
+      afterFetchSeriesData={afterFetchData}
+    >
+      {({errorMessage: widgetQueriesErrorMessage, ...rest}) =>
+        children({
+          errorMessage: errorMessage ?? widgetQueriesErrorMessage,
+          ...rest,
+        })
+      }
+    </GenericWidgetQueries>
+  );
 }
 
 export default ReleaseWidgetQueries;
