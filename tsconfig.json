@@ -1,7 +1,10 @@
 {
   "extends": "./config/tsconfig.build.json",
   "compilerOptions": {
-    "allowJs": true
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx"
   },
   "include": ["static", "tests/js", "docs-ui"],
   "exclude": ["node_modules", "**/*.benchmark.ts"]
