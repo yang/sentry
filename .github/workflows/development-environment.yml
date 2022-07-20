@@ -56,7 +56,7 @@ jobs:
       - name: Setup Python & cache
         uses: actions/setup-python@b4fe97ecda6b7a5fcd2448cdbf6a8fc76b3bedb0
         with:
-          python-version: 3.8.13
+          python-version: 3.9.14
           cache: 'pip'
           cache-dependency-path: requirements-dev-frozen.txt
 
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b  # v3
       - uses: actions/setup-python@b4fe97ecda6b7a5fcd2448cdbf6a8fc76b3bedb0
         with:
-          python-version: 3.8.13
+          python-version: 3.9.14
           cache: pip
           cache-dependency-path: requirements-dev-only-frozen.txt
       - name: install dependencies
