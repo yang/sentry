@@ -1,11 +1,47 @@
-import {render, screen, userEvent, within} from 'sentry-test/reactTestingLibrary';
+import {
+  render,
+  screen,
+  userEvent,
+  waitFor,
+  within,
+} from 'sentry-test/reactTestingLibrary';
 
-import * as modal from 'sentry/actionCreators/modal';
 import {SERVER_SIDE_SAMPLING_DOC_LINK} from 'sentry/views/settings/project/server-side-sampling/utils';
 
-import {getMockData, mockedProjects, TestComponent, uniformRule} from './utils';
+import {
+  getMockData,
+  mockedProjects,
+  mockedSamplingDistribution,
+  mockedSamplingSdkVersions,
+  specificRule,
+  TestComponent,
+  uniformRule,
+} from './utils';
 
 describe('Server-side Sampling', function () {
+  let distributionMock: ReturnType<typeof MockApiClient.addMockResponse> | undefined =
+    undefined;
+  let sdkVersionsMock: ReturnType<typeof MockApiClient.addMockResponse> | undefined =
+    undefined;
+
+  beforeEach(function () {
+    distributionMock = MockApiClient.addMockResponse({
+      url: '/projects/org-slug/project-slug/dynamic-sampling/distribution/',
+      method: 'GET',
+      body: mockedSamplingDistribution,
+    });
+
+    sdkVersionsMock = MockApiClient.addMockResponse({
+      url: '/organizations/org-slug/dynamic-sampling/sdk-versions/',
+      method: 'GET',
+      body: mockedSamplingSdkVersions,
+    });
+  });
+
+  afterEach(() => {
+    MockApiClient.clearMockResponses();
+  });
+
   it('renders onboarding promo', function () {
     const {router, organization, project} = getMockData();
 
@@ -19,16 +55,18 @@ describe('Server-side Sampling', function () {
 
     expect(
       screen.getByText(
-        'Server-side sampling provides an additional dial for dropping transactions. This comes in handy when your server-side sampling rules target the transactions you want to keep, but you need more of those transactions being sent by the SDK.'
+        'Server-side sampling lets you control what transactions Sentry retains by setting sample rules and rates so you see more of the transactions you want to explore further in Sentry – and less of the ones you don’t – without re-configuring the Sentry SDK and redeploying anything.'
       )
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', {name: 'No sampling rules active yet'})
+      screen.getByRole('heading', {name: 'Set sample rules for your project'})
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText('Set up your project for sampling success')
+      screen.getByText(
+        'Because every project is different – some need more events from high converting pages, critical API endpoints, or just want to focus on latency issues from the latest release – set multiple sample rules with different sample rates per project so you can keep what you need and drop what you don’t.'
+      )
     ).toBeInTheDocument();
 
     expect(screen.getByRole('button', {name: 'Read Docs'})).toHaveAttribute(
@@ -36,7 +74,7 @@ describe('Server-side Sampling', function () {
       SERVER_SIDE_SAMPLING_DOC_LINK
     );
 
-    expect(screen.getByRole('button', {name: 'Get Started'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Start Setup'})).toBeInTheDocument();
 
     expect(container).toSnapshot();
   });
@@ -46,25 +84,7 @@ describe('Server-side Sampling', function () {
       projects: [
         TestStubs.Project({
           dynamicSampling: {
-            rules: [
-              {
-                sampleRate: 0.2,
-                type: 'trace',
-                active: false,
-                condition: {
-                  op: 'and',
-                  inner: [
-                    {
-                      op: 'glob',
-                      name: 'trace.release',
-                      value: ['1.2.3'],
-                    },
-                  ],
-                },
-                id: 1,
-              },
-            ],
-            next_id: 2,
+            rules: [{...uniformRule, sampleRate: 1}],
           },
         }),
       ],
@@ -84,9 +104,8 @@ describe('Server-side Sampling', function () {
     expect(screen.getAllByTestId('sampling-rule').length).toBe(1);
     expect(screen.queryByLabelText('Drag Rule')).not.toBeInTheDocument();
     expect(screen.getByTestId('sampling-rule')).toHaveTextContent('If');
-    expect(screen.getByTestId('sampling-rule')).toHaveTextContent('Release');
-    expect(screen.getByTestId('sampling-rule')).toHaveTextContent('1.2.3');
-    expect(screen.getByTestId('sampling-rule')).toHaveTextContent('20%');
+    expect(screen.getByTestId('sampling-rule')).toHaveTextContent('All');
+    expect(screen.getByTestId('sampling-rule')).toHaveTextContent('100%');
     expect(screen.getByLabelText('Activate Rule')).toBeInTheDocument();
     expect(screen.getByLabelText('Actions')).toBeInTheDocument();
 
@@ -149,8 +168,6 @@ describe('Server-side Sampling', function () {
   });
 
   it('display "update sdk versions" alert and open "recommended next step" modal', async function () {
-    jest.spyOn(modal, 'openModal');
-
     const {organization, projects, router} = getMockData({
       projects: mockedProjects,
     });
@@ -164,13 +181,19 @@ describe('Server-side Sampling', function () {
       />
     );
 
-    const recommendedSdkUpgradesAlert = await screen.findByTestId(
+    expect(distributionMock).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(sdkVersionsMock).toHaveBeenCalled();
+    });
+
+    const recommendedSdkUpgradesAlert = screen.getByTestId(
       'recommended-sdk-upgrades-alert'
     );
 
     expect(
       within(recommendedSdkUpgradesAlert).getByText(
-        'To keep a consistent amount of transactions across your applications multiple services, we recommend you update the SDK versions for the following projects:'
+        'To ensure you are properly monitoring the performance of all your other services, we require you update to the latest version of the following SDK(s):'
       )
     ).toBeInTheDocument();
 
@@ -190,53 +213,10 @@ describe('Server-side Sampling', function () {
       })
     );
 
-    expect(
-      await screen.findByRole('heading', {name: 'Recommended next steps\u2026'})
-    ).toBeInTheDocument();
-  });
-
-  it('Open activate modal', async function () {
-    const {router, project, organization} = getMockData({
-      projects: [
-        TestStubs.Project({
-          dynamicSampling: {
-            rules: [
-              {
-                sampleRate: 1,
-                type: 'trace',
-                active: false,
-                condition: {
-                  op: 'and',
-                  inner: [],
-                },
-                id: 1,
-              },
-            ],
-          },
-        }),
-      ],
-    });
-
-    render(
-      <TestComponent
-        organization={organization}
-        project={project}
-        router={router}
-        withModal
-      />
-    );
-
-    // Open Modal
-    userEvent.click(screen.getByLabelText('Activate Rule'));
-
-    expect(
-      await screen.findByRole('heading', {name: 'Activate Rule'})
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', {name: 'Next steps'})).toBeInTheDocument();
   });
 
   it('Open specific conditions modal', async function () {
-    jest.spyOn(modal, 'openModal');
-
     const {router, project, organization} = getMockData({
       projects: [
         TestStubs.Project({
@@ -293,6 +273,101 @@ describe('Server-side Sampling', function () {
     userEvent.hover(screen.getByText('Add Rule'));
     expect(
       await screen.findByText("You don't have permission to add a rule")
+    ).toBeInTheDocument();
+
+    expect(distributionMock).not.toHaveBeenCalled();
+    expect(sdkVersionsMock).not.toHaveBeenCalled();
+  });
+
+  // eslint-disable-next-line jest/no-disabled-tests
+  it.skip('does not let the user activate a rule if sdk updates exists', async function () {
+    const {organization, router, project} = getMockData({
+      projects: [
+        TestStubs.Project({
+          dynamicSampling: {
+            rules: [uniformRule],
+          },
+        }),
+      ],
+    });
+
+    render(
+      <TestComponent organization={organization} project={project} router={router} />
+    );
+
+    expect(screen.getByRole('checkbox', {name: 'Activate Rule'})).toBeDisabled();
+
+    userEvent.hover(screen.getByLabelText('Activate Rule'));
+
+    expect(
+      await screen.findByText(
+        'To enable the rule, the recommended sdk version have to be updated'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('open uniform rate modal when editing a uniform rule', async function () {
+    const {organization, router, project} = getMockData({
+      projects: [
+        TestStubs.Project({
+          dynamicSampling: {
+            rules: [uniformRule],
+          },
+        }),
+      ],
+    });
+
+    render(
+      <TestComponent
+        organization={organization}
+        project={project}
+        router={router}
+        withModal
+      />
+    );
+
+    userEvent.click(screen.getByLabelText('Actions'));
+
+    // Open Modal
+    userEvent.click(screen.getByLabelText('Edit'));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Define a global sample rate',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('does not let user reorder uniform rule', async function () {
+    const {organization, router, project} = getMockData({
+      projects: [
+        TestStubs.Project({
+          dynamicSampling: {
+            rules: [specificRule, uniformRule],
+          },
+        }),
+      ],
+    });
+
+    render(
+      <TestComponent
+        organization={organization}
+        project={project}
+        router={router}
+        withModal
+      />
+    );
+
+    const samplingUniformRule = screen.getAllByTestId('sampling-rule')[1];
+
+    expect(
+      within(samplingUniformRule).getByRole('button', {name: 'Drag Rule'})
+    ).toHaveAttribute('aria-disabled', 'true');
+
+    userEvent.hover(within(samplingUniformRule).getByLabelText('Drag Rule'));
+
+    expect(
+      await screen.findByText('Uniform rules cannot be reordered')
     ).toBeInTheDocument();
   });
 });
