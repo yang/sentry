@@ -3,8 +3,10 @@ import psycopg2 as Database
 # Some of these imports are unused, but they are inherited from other engines
 # and should be available as part of the backend ``base.py`` namespace.
 from django.db.backends.postgresql.base import DatabaseWrapper
+from django.db.utils import OperationalError
 
 from sentry.utils.strings import strip_lone_surrogates
+from sentry.exceptions import ServiceUnavailable
 
 from .creation import SentryDatabaseCreation
 from .decorators import (
@@ -107,7 +109,10 @@ class DatabaseWrapper(DatabaseWrapper):
 
     @auto_reconnect_connection
     def _cursor(self, *args, **kwargs):
-        return super()._cursor()
+        try:
+            return super()._cursor()
+        except OperationalError as e:
+            raise ServiceUnavailable(str(e), name="postgres")
 
     # We're overriding this internal method that's present in Django 1.11+, because
     # things were shuffled around since 1.10 resulting in not constructing a django CursorWrapper

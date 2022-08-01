@@ -6,7 +6,7 @@ from time import time
 
 from django.conf import settings
 
-from sentry.exceptions import InvalidConfiguration
+from sentry.exceptions import ServiceUnavailable
 from sentry.utils import redis
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class ConcurrentRateLimiter:
             self.client.ping()
             self.client.connection_pool.disconnect()
         except Exception as e:
-            raise InvalidConfiguration(str(e))
+            raise ServiceUnavailable(str(e), name="redis")
 
     def namespaced_key(self, key: str) -> str:
         return f"concurrent_limit:{key}"

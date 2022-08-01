@@ -8,7 +8,7 @@ import sentry_sdk
 from django.conf import settings
 
 from sentry import options
-from sentry.exceptions import InvalidConfiguration
+from sentry.exceptions import ServiceUnavailable
 from sentry.models.file import get_storage
 from sentry.utils import json
 from sentry.utils.http import absolute_uri
@@ -45,8 +45,9 @@ class Chartcuterie(ChartRenderer):
             return
 
         if self.storage_options is not None and self.storage_options["options"] is None:
-            raise InvalidConfiguration(
-                "`chart-rendering.storage.options` must be configured if `chart-rendering.storage.backend` is configured"
+            raise ServiceUnavailable(
+                "`chart-rendering.storage.options` must be configured if `chart-rendering.storage.backend` is configured",
+                name="chartcuterie",
             )
 
         if not self.service_url:

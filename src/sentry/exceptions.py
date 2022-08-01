@@ -29,6 +29,19 @@ class InvalidConfiguration(Exception):
     pass
 
 
+class ServiceUnavailable(Exception):
+    def __init__(self, *args, name=""):
+        self.name = name
+
+    def __str__(self):
+        return f"""
+Service `{self.name}` unavailable:
+{super().__str__()}
+
+You probably need to run `sentry devservices up`.
+"""
+
+
 class DeleteAborted(Exception):
     pass
 

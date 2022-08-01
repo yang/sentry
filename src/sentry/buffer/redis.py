@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes, force_text
 
 from sentry.buffer import Buffer
-from sentry.exceptions import InvalidConfiguration
+from sentry.exceptions import ServiceUnavailable
 from sentry.tasks.process_buffer import process_incr, process_pending
 from sentry.utils import json, metrics
 from sentry.utils.compat import crc32
@@ -66,7 +66,7 @@ class RedisBuffer(Buffer):
             # disconnect after successfull service validation
             self.cluster.disconnect_pools()
         except Exception as e:
-            raise InvalidConfiguration(str(e))
+            raise ServiceUnavailable(str(e), name="redis")
 
     def _coerce_val(self, value):
         if isinstance(value, models.Model):

@@ -385,6 +385,8 @@ def initialize_app(config, skip_service_validation=False):
 
 
 def setup_services(validate=True):
+    # hmm, could probably just do it here actually
+    # to prevent massive postgres barf
     from sentry import (
         analytics,
         buffer,

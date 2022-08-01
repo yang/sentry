@@ -79,7 +79,7 @@ from dataclasses import dataclass
 from time import time
 from typing import Any, Iterator, Optional, Sequence, Tuple
 
-from sentry.exceptions import InvalidConfiguration
+from sentry.exceptions import ServiceUnavailable
 from sentry.utils import redis
 from sentry.utils.services import Service
 
@@ -277,7 +277,7 @@ class RedisSlidingWindowRateLimiter(SlidingWindowRateLimiter):
             self.client.ping()
             self.client.connection_pool.disconnect()
         except Exception as e:
-            raise InvalidConfiguration(str(e))
+            raise ServiceUnavailable(str(e), name="redis")
 
     def _build_redis_key_raw(self, prefix: str, window: int, granularity: int, granule: int) -> str:
         if "{" in prefix or "}" in prefix:

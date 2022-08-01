@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from redis.exceptions import RedisError
 
-from sentry.exceptions import InvalidConfiguration
+from sentry.exceptions import ServiceUnavailable
 from sentry.ratelimits.base import RateLimiter
 from sentry.utils import redis
 from sentry.utils.hashlib import md5_text
@@ -67,7 +67,7 @@ class RedisRateLimiter(RateLimiter):
             self.client.ping()
             self.client.connection_pool.disconnect()
         except Exception as e:
-            raise InvalidConfiguration(str(e))
+            raise ServiceUnavailable(str(e), name="redis")
 
     def current_value(
         self, key: str, project: Project | None = None, window: int | None = None
