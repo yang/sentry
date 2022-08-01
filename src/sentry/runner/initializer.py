@@ -363,6 +363,15 @@ def initialize_app(config, skip_service_validation=False):
 
     bind_cache_to_option_store()
 
+    # register_plugins will involve a lot of nonfatal (by design) options
+    # fetching. If postgres isn't available, a lot of error spew can happen,
+    # so we check explicitly for postgres fatally here.
+    # This is also toggleable with skip_service_validation (SENTRY_SKIP_BACKEND_VALIDATION)
+    # because the later setup_services effectively also checks (fatally)
+    # for things like redis and snuba.
+    if not skip_service_validation:
+        validate_postgres()
+
     register_plugins(settings)
 
     initialize_receivers()
@@ -385,11 +394,10 @@ def initialize_app(config, skip_service_validation=False):
 
 
 def setup_services(validate=True):
-    # hmm, could probably just do it here actually
-    # to prevent massive postgres barf
     from sentry import (
         analytics,
         buffer,
+        charts,
         digests,
         newsletter,
         nodestore,
@@ -405,6 +413,7 @@ def setup_services(validate=True):
     service_list = (
         analytics,
         buffer,
+        charts,
         digests,
         newsletter,
         nodestore,
@@ -616,6 +625,10 @@ def apply_legacy_settings(settings):
         raise ConfigurationError(
             "`system.secret-key` MUST be set. Use 'sentry config generate-secret-key' to get one."
         )
+
+
+def validate_postgres():
+    exit()
 
 
 def validate_snuba():

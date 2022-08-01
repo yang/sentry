@@ -344,6 +344,13 @@ class QuerySetBuilder:
 
 
 class SnubaSearchBackendBase(SearchBackend, metaclass=ABCMeta):
+    def validate(self):
+        # TODO look at what happens if snuba is unavailable.
+        # Not sure if I want to add something here because would like
+        # for tests that don't need snuba to run to be able to skip
+        # this validation.
+        pass
+
     def query(
         self,
         projects: Sequence[Project],
