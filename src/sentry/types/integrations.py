@@ -45,3 +45,10 @@ def get_provider_enum(value: Optional[str]) -> Optional[ExternalProviders]:
 
 def get_provider_choices(providers: Set[ExternalProviders]) -> Sequence[str]:
     return list(EXTERNAL_PROVIDERS.get(i) for i in providers)
+
+
+def get_provider_enum_from_string(provider: str) -> ExternalProviders:
+    for k, v in EXTERNAL_PROVIDERS.items():
+        if v == provider:
+            return k
+    raise Exception("Invalid provider ${provider}")

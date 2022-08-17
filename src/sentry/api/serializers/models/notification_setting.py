@@ -3,7 +3,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional, Set, Union
 
 from sentry.api.serializers import Serializer
 from sentry.models import NotificationSetting, Team, User
-from sentry.notifications.helpers import get_fallback_settings
+from sentry.notifications.helpers import get_fallback_settings, get_providers_for_recipient
 from sentry.notifications.types import VALID_VALUES_FOR_KEY, NotificationSettingTypes
 
 
@@ -106,6 +106,9 @@ class NotificationSettingsSerializer(Serializer):  # type: ignore
             recipient=obj,
         )
 
+        # only return results for the providers we have available
+        providers = list(map(lambda x: x.value, get_providers_for_recipient(obj)))
+
         # Forgive the variable name, I wanted the following lines to be legible.
         for n in attrs["settings"]:
             # Filter out invalid notification settings.
@@ -115,5 +118,7 @@ class NotificationSettingsSerializer(Serializer):  # type: ignore
                 continue
 
             # Override the notification settings.
-            data[n.type_str][n.scope_str][n.scope_identifier][n.provider_str] = n.value_str
+            print("pri", providers, n.provider)
+            if n.provider in providers:
+                data[n.type_str][n.scope_str][n.scope_identifier][n.provider_str] = n.value_str
         return data

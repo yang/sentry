@@ -48,8 +48,8 @@ class UserNotificationSettingsGetTest(UserNotificationSettingsTestBase):
         # Spot check.
         assert response.data["alerts"]["user"][self.user.id]["email"] == "never"
         assert response.data["deploy"]["organization"][self.organization.id]["email"] == "never"
-        assert response.data["deploy"]["organization"][self.organization.id]["slack"] == "always"
-        assert response.data["workflow"]["user"][self.user.id]["slack"] == "subscribe_only"
+        assert "slack" not in response.data["deploy"]["organization"][self.organization.id]
+        assert "slack" not in response.data["workflow"]["user"][self.user.id]
 
     def test_notification_settings_empty(self):
         _ = self.organization  # HACK to force creation.
@@ -59,8 +59,8 @@ class UserNotificationSettingsGetTest(UserNotificationSettingsTestBase):
         # Spot check.
         assert response.data["alerts"]["user"][self.user.id]["email"] == "always"
         assert response.data["deploy"]["organization"][self.organization.id]["email"] == "default"
-        assert response.data["deploy"]["organization"][self.organization.id]["slack"] == "default"
-        assert response.data["workflow"]["user"][self.user.id]["slack"] == "subscribe_only"
+        assert "slack" not in response.data["deploy"]["organization"][self.organization.id]
+        assert "slack" not in response.data["workflow"]["user"][self.user.id]
 
     def test_type_querystring(self):
         response = self.get_success_response("me", qs_params={"type": "workflow"})
