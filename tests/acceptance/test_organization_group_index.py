@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytz
 from django.utils import timezone
+from freezegun import freeze_time
 
 from fixtures.page_objects.issue_list import IssueListPage
 from sentry.models import AssistantActivity, GroupInboxReason, GroupStatus
@@ -113,9 +114,8 @@ class OrganizationGroupIndexTest(AcceptanceTestCase, SnubaTestCase):
 
             assert len(groups) == 1
 
-    @patch("django.utils.timezone.now")
-    def test_resolve_issues_multi_projects(self, mock_now):
-        mock_now.return_value = datetime.utcnow().replace(tzinfo=pytz.utc)
+    @freeze_time
+    def test_resolve_issues_multi_projects(self):
         self.create_issues()
 
         with self.feature("organizations:global-views"):
