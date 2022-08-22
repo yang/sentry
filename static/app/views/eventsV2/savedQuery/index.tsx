@@ -15,8 +15,8 @@ import Banner from 'sentry/components/banner';
 import Button from 'sentry/components/button';
 import ButtonBar from 'sentry/components/buttonBar';
 import {CreateAlertFromViewButton} from 'sentry/components/createAlertButton';
-import InputControl from 'sentry/components/forms/controls/input';
 import {Hovercard} from 'sentry/components/hovercard';
+import InputControl from 'sentry/components/input';
 import {Overlay, PositionWrapper} from 'sentry/components/overlay';
 import {IconDelete, IconStar} from 'sentry/icons';
 import {t} from 'sentry/locale';
@@ -103,9 +103,6 @@ type Props = DefaultProps & {
    * passed down only because it is needed for navigation.
    */
   location: Location;
-  onIncompatibleAlertQuery: React.ComponentProps<
-    typeof CreateAlertFromViewButton
-  >['onIncompatibleQuery'];
   organization: Organization;
   projects: Project[];
   router: InjectedRouter;
@@ -343,7 +340,7 @@ class SavedQueryButtonGroup extends PureComponent<Props, State> {
   }
 
   renderButtonCreateAlert() {
-    const {eventView, organization, projects, onIncompatibleAlertQuery} = this.props;
+    const {eventView, organization, projects} = this.props;
 
     return (
       <GuideAnchor target="create_alert_from_discover">
@@ -351,8 +348,7 @@ class SavedQueryButtonGroup extends PureComponent<Props, State> {
           eventView={eventView}
           organization={organization}
           projects={projects}
-          onIncompatibleQuery={onIncompatibleAlertQuery}
-          onSuccess={this.handleCreateAlertSuccess}
+          onClick={this.handleCreateAlertSuccess}
           referrer="discover"
           aria-label={t('Create Alert')}
           data-test-id="discover2-create-from-discover"
@@ -362,7 +358,7 @@ class SavedQueryButtonGroup extends PureComponent<Props, State> {
   }
 
   renderButtonAddToDashboard() {
-    const {organization, eventView, savedQuery, yAxis, router} = this.props;
+    const {organization, eventView, savedQuery, yAxis, router, location} = this.props;
     return (
       <Button
         key="add-dashboard-widget-from-discover"
@@ -370,6 +366,7 @@ class SavedQueryButtonGroup extends PureComponent<Props, State> {
         onClick={() =>
           handleAddQueryToDashboard({
             organization,
+            location,
             eventView,
             query: savedQuery,
             yAxis,

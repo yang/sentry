@@ -14,10 +14,9 @@ from sentry.eventstream.kafka.postprocessworker import (
     PostProcessForwarderWorker,
     TransactionsPostProcessForwarderWorker,
 )
-from sentry.eventstream.kafka.protocol import get_task_kwargs_for_message
 from sentry.eventstream.snuba import KW_SKIP_SEMANTIC_PARTITIONING, SnubaProtocolEventStream
 from sentry.killswitches import killswitch_matches_context
-from sentry.utils import json, kafka, metrics
+from sentry.utils import json, kafka
 from sentry.utils.batching_kafka_consumer import BatchingKafkaConsumer
 
 logger = logging.getLogger(__name__)
@@ -27,9 +26,17 @@ class KafkaEventStream(SnubaProtocolEventStream):
     def __init__(self, **options):
         self.topic = settings.KAFKA_EVENTS
         self.transactions_topic = settings.KAFKA_TRANSACTIONS
+        self.assign_transaction_partitions_randomly = (
+            settings.SENTRY_EVENTSTREAM_PARTITION_TRANSACTIONS_RANDOMLY
+        )
 
     @cached_property
     def producer(self):
+        # TODO: The producer is currently hardcoded to KAFKA_EVENTS. This assumes that the transactions
+        # topic is either the same (or is on the same cluster) as the events topic. Since we are in the
+        # process of splitting the topic this will no longer be true. This should be fixed and we should
+        # drop this requirement when the KafkaEventStream is refactored to be agnostic of dataset specific
+        # details and the correct topic should be passed into here instead of hardcoding events.
         return kafka.producers.get(settings.KAFKA_EVENTS)
 
     def delivery_callback(self, error, message):
@@ -58,11 +65,8 @@ class KafkaEventStream(SnubaProtocolEventStream):
                 value = False
             return str(int(value))
 
-        # WARNING: We must remove all None headers. There is a bug in confluent-kafka-python
-        # (used by both Sentry and Snuba) that incorrectly decrements the reference count of
-        # Python's None on any attempt to read header values containing null values, leading
-        # None to eventually get deallocated and crash the interpreter. The bug exists in the
-        # version we are using (1.5) as well as in the latest (at the time of writing) 1.7 version.
+        # we strip `None` values here so later in the pipeline they can be
+        # cleanly encoded without nullability checks
         def strip_none_values(value: Mapping[str, Optional[str]]) -> Mapping[str, str]:
             return {key: value for key, value in value.items() if value is not None}
 
@@ -114,10 +118,14 @@ class KafkaEventStream(SnubaProtocolEventStream):
         **kwargs,
     ):
         message_type = "transaction" if self._is_transaction_event(event) else "error"
-        assign_partitions_randomly = killswitch_matches_context(
-            "kafka.send-project-events-to-random-partitions",
-            {"project_id": event.project_id, "message_type": message_type},
-        )
+
+        if message_type == "transaction" and self.assign_transaction_partitions_randomly:
+            assign_partitions_randomly = True
+        else:
+            assign_partitions_randomly = killswitch_matches_context(
+                "kafka.send-project-events-to-random-partitions",
+                {"project_id": event.project_id, "message_type": message_type},
+            )
 
         if assign_partitions_randomly:
             kwargs[KW_SKIP_SEMANTIC_PARTITIONING] = True
@@ -188,6 +196,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
         self,
         entity: Union[Literal["all"], Literal["errors"], Literal["transactions"]],
         consumer_group: str,
+        topic: Optional[str],
         commit_log_topic: str,
         synchronize_commit_group: str,
         commit_batch_size: int = 100,
@@ -199,11 +208,11 @@ class KafkaEventStream(SnubaProtocolEventStream):
         if entity == PostProcessForwarderType.TRANSACTIONS:
             cluster_name = settings.KAFKA_TOPICS[settings.KAFKA_TRANSACTIONS]["cluster"]
             worker = TransactionsPostProcessForwarderWorker(concurrency=concurrency)
-            topic = self.transactions_topic
+            default_topic = self.transactions_topic
         elif entity == PostProcessForwarderType.ERRORS:
             cluster_name = settings.KAFKA_TOPICS[settings.KAFKA_EVENTS]["cluster"]
             worker = ErrorsPostProcessForwarderWorker(concurrency=concurrency)
-            topic = self.topic
+            default_topic = self.topic
         else:
             # Default implementation which processes both errors and transactions
             # irrespective of values in the header. This would most likely be the case
@@ -212,7 +221,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
             cluster_name = settings.KAFKA_TOPICS[settings.KAFKA_EVENTS]["cluster"]
             assert cluster_name == settings.KAFKA_TOPICS[settings.KAFKA_TRANSACTIONS]["cluster"]
             worker = PostProcessForwarderWorker(concurrency=concurrency)
-            topic = self.topic
+            default_topic = self.topic
             assert self.topic == self.transactions_topic
 
         synchronized_consumer = SynchronizedConsumer(
@@ -224,7 +233,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
         )
 
         consumer = BatchingKafkaConsumer(
-            topics=topic,
+            topics=topic or default_topic,
             worker=worker,
             max_batch_size=commit_batch_size,
             max_batch_time=commit_batch_timeout_ms,
@@ -237,6 +246,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
         self,
         entity: Union[Literal["all"], Literal["errors"], Literal["transactions"]],
         consumer_group: str,
+        topic: Optional[str],
         commit_log_topic: str,
         synchronize_commit_group: str,
         commit_batch_size: int = 100,
@@ -246,6 +256,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
         consumer = self._build_consumer(
             entity,
             consumer_group,
+            topic,
             commit_log_topic,
             synchronize_commit_group,
             commit_batch_size,
@@ -261,28 +272,11 @@ class KafkaEventStream(SnubaProtocolEventStream):
 
         consumer.run()
 
-    def _get_task_kwargs_and_dispatch(self, message) -> None:
-        with metrics.timer("eventstream.duration", instance="get_task_kwargs_for_message"):
-            task_kwargs = get_task_kwargs_for_message(message.value())
-
-        if task_kwargs is not None:
-            if task_kwargs["group_id"] is None:
-                metrics.incr(
-                    "eventstream.messages",
-                    tags={"partition": message.partition(), "type": "transactions"},
-                )
-            else:
-                metrics.incr(
-                    "eventstream.messages",
-                    tags={"partition": message.partition(), "type": "errors"},
-                )
-            with metrics.timer("eventstream.duration", instance="dispatch_post_process_group_task"):
-                self._dispatch_post_process_group_task(**task_kwargs)
-
     def run_post_process_forwarder(
         self,
         entity: Union[Literal["all"], Literal["errors"], Literal["transactions"]],
         consumer_group: str,
+        topic: Optional[str],
         commit_log_topic: str,
         synchronize_commit_group: str,
         commit_batch_size: int = 100,
@@ -294,6 +288,7 @@ class KafkaEventStream(SnubaProtocolEventStream):
         self.run_batched_consumer(
             entity,
             consumer_group,
+            topic,
             commit_log_topic,
             synchronize_commit_group,
             commit_batch_size,

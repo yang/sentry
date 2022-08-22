@@ -18,7 +18,7 @@ import {
 
 import PageFiltersStore from 'sentry/stores/pageFiltersStore';
 import ProjectsStore from 'sentry/stores/projectsStore';
-import {WebVital} from 'sentry/utils/discover/fields';
+import {WebVital} from 'sentry/utils/fields';
 import TrendsIndex from 'sentry/views/performance/trends/';
 import {defaultTrendsSelectionDate} from 'sentry/views/performance/trends/content';
 import {
@@ -114,14 +114,14 @@ function _initializeData(
       throw new Error("Test is selecting project that isn't loaded");
     } else {
       PageFiltersStore.updateProjects(
-        settings.project ? [Number(selectedProject)] : [],
+        settings.selectedProject ? [Number(selectedProject)] : [],
         []
       );
     }
-    newSettings.project = selectedProject;
+    newSettings.selectedProject = selectedProject.id;
   }
 
-  newSettings.project = settings.project ?? newSettings.projects[0];
+  newSettings.selectedProject = settings.selectedProject ?? newSettings.projects[0].id;
   const data = initializeData(newSettings);
 
   // Modify page filters store to stop rerendering due to the test harness.
@@ -136,7 +136,7 @@ function _initializeData(
   PageFiltersStore.updateDateTime(defaultTrendsSelectionDate);
   if (!options?.selectedProjectId) {
     PageFiltersStore.updateProjects(
-      settings.project ? [Number(newSettings.projects[0].id)] : [],
+      settings.selectedProject ? [Number(newSettings.projects[0].id)] : [],
       []
     );
   }

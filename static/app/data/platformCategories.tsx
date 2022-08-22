@@ -1,3 +1,6 @@
+// Mirrors src/sentry/utils/platform_categories.py
+// When changing this file, make sure to keep src/sentry/utils/platform_categories.py in sync.
+
 import {t} from 'sentry/locale';
 
 export const popularPlatformCategories = [
@@ -7,6 +10,7 @@ export const popularPlatformCategories = [
   'python-django',
   'python',
   'python-flask',
+  'python-fastapi',
   'ruby-rails',
   'node-express',
   'php-laravel',
@@ -40,6 +44,7 @@ export const frontend = [
   'javascript-gatsby',
   'javascript-vue',
   'javascript-nextjs',
+  'javascript-remix',
   'unity',
 ] as const;
 
@@ -92,6 +97,8 @@ export const backend = [
   'python',
   'python-django',
   'python-flask',
+  'python-fastapi',
+  'python-starlette',
   'python-sanic',
   'python-celery',
   'python-bottle',
@@ -170,6 +177,8 @@ export const performance: PlatformKey[] = [
   'python',
   'python-django',
   'python-flask',
+  'python-fastapi',
+  'python-starlette',
   'python-sanic',
   'python-celery',
   'python-bottle',
@@ -207,6 +216,7 @@ export const releaseHealth: PlatformKey[] = [
   'javascript-gatsby',
   'javascript-vue',
   'javascript-nextjs',
+  'javascript-remix',
   // mobile
   'android',
   'apple-ios',
@@ -224,6 +234,8 @@ export const releaseHealth: PlatformKey[] = [
   'python',
   'python-django',
   'python-flask',
+  'python-fastapi',
+  'python-starlette',
   'python-sanic',
   'python-celery',
   'python-bottle',

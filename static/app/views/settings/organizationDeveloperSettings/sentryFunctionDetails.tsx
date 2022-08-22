@@ -1,4 +1,5 @@
-import React, {useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
+import {browserHistory} from 'react-router';
 import Editor from '@monaco-editor/react';
 
 import {
@@ -14,8 +15,58 @@ import FormModel from 'sentry/components/forms/model';
 import {Field} from 'sentry/components/forms/type';
 import {Panel, PanelBody, PanelHeader} from 'sentry/components/panels';
 import {t} from 'sentry/locale';
+import {SentryFunction} from 'sentry/types';
 
-type Props = WrapperProps;
+import SentryFunctionEnvironmentVariables from './sentryFunctionsEnvironmentVariables';
+import SentryFunctionSubscriptions from './sentryFunctionSubscriptions';
+
+class SentryFunctionFormModel extends FormModel {
+  getTransformedData() {
+    const data = super.getTransformedData() as Record<string, any>;
+
+    const events: string[] = [];
+    if (data.onIssue) {
+      events.push('issue');
+    }
+    if (data.onError) {
+      events.push('error');
+    }
+    if (data.onComment) {
+      events.push('comment');
+    }
+    delete data.onIssue;
+    delete data.onError;
+    delete data.onComment;
+    data.events = events;
+
+    const envVariables: EnvVariable[] = [];
+    let i = 0;
+    while (data[`env-variable-name-${i}`]) {
+      if (data[`env-variable-value-${i}`]) {
+        envVariables.push({
+          name: data[`env-variable-name-${i}`],
+          value: data[`env-variable-value-${i}`],
+        });
+      }
+      delete data[`env-variable-name-${i}`];
+      delete data[`env-variable-value-${i}`];
+      i++;
+    }
+    data.envVariables = envVariables;
+
+    const {...output} = data;
+    return output;
+  }
+}
+
+type Props = {
+  sentryFunction?: SentryFunction;
+} & WrapperProps;
+
+type EnvVariable = {
+  name: string;
+  value: string;
+};
 const formFields: Field[] = [
   {
     name: 'name',
@@ -42,10 +93,34 @@ const formFields: Field[] = [
 ];
 
 function SentryFunctionDetails(props: Props) {
-  const form = useRef(new FormModel());
+  const form = useRef(new SentryFunctionFormModel());
   const {orgId, functionSlug} = props.params;
+  const {sentryFunction} = props;
   const method = functionSlug ? 'PUT' : 'POST';
-  const endpoint = `/organizations/${orgId}/functions/`;
+  let endpoint = `/organizations/${orgId}/functions/`;
+  if (functionSlug) {
+    endpoint += `${functionSlug}/`;
+  }
+  const defaultCode = sentryFunction
+    ? sentryFunction.code
+    : `exports.yourFunction = (req, res) => {
+    let message = req.query.message || req.body.message || 'Hello World!';
+    console.log('Query: ' + req.query);
+    console.log('Body: ' + req.body);
+    res.status(200).send(message);
+  };`;
+
+  const [events, setEvents] = useState(sentryFunction?.events || []);
+
+  useEffect(() => {
+    form.current.setValue('onIssue', events.includes('issue'));
+    form.current.setValue('onError', events.includes('error'));
+    form.current.setValue('onComment', events.includes('comment'));
+  }, [events]);
+
+  const [envVariables, setEnvVariables] = useState(
+    sentryFunction?.env_variables || [{name: '', value: ''}]
+  );
 
   const handleSubmitError = err => {
     let errorMessage = t('Unknown Error');
@@ -57,23 +132,26 @@ function SentryFunctionDetails(props: Props) {
 
   const handleSubmitSuccess = data => {
     addSuccessMessage(t('Sentry Function successfully saved.', data.name));
+    const baseUrl = `/settings/${orgId}/developer-settings/sentry-functions/`;
+    const url = `${baseUrl}${data.slug}/`;
+    if (sentryFunction) {
+      addSuccessMessage(t('%s successfully saved.', data.name));
+    } else {
+      addSuccessMessage(t('%s successfully created.', data.name));
+    }
+    browserHistory.push(url);
   };
 
   function handleEditorChange(value, _event) {
     form.current.setValue('code', value);
   }
 
-  const defaultCode = `exports.yourFunction = (req, res) => {
-    let message = req.query.message || req.body.message || 'Hello World!';
-    console.log('Query: ' + req.query);
-    console.log('Body: ' + req.body);
-    res.status(200).send(message);
-};`;
   return (
     <div>
       <Feature features={['organizations:sentry-functions']}>
-        <h1>{t('Sentry Function Details')}</h1>
-        <h2>{props.params.orgId}</h2>
+        <h2>
+          {sentryFunction ? t('Editing Sentry Function') : t('Create Sentry Function')}
+        </h2>
         <Form
           apiMethod={method}
           apiEndpoint={endpoint}
@@ -81,12 +159,30 @@ function SentryFunctionDetails(props: Props) {
           onPreSubmit={() => {
             addLoadingMessage(t('Saving changes..'));
           }}
+          initialData={{
+            code: defaultCode,
+            events,
+            envVariables,
+            ...props.sentryFunction,
+          }}
           onSubmitError={handleSubmitError}
           onSubmitSuccess={handleSubmitSuccess}
         >
           <JsonForm forms={[{title: t('Sentry Function Details'), fields: formFields}]} />
           <Panel>
-            <PanelHeader>Write your Code Below</PanelHeader>
+            <PanelHeader>{t('Webhooks')}</PanelHeader>
+            <PanelBody>
+              <SentryFunctionSubscriptions events={events} setEvents={setEvents} />
+            </PanelBody>
+          </Panel>
+          <Panel>
+            <SentryFunctionEnvironmentVariables
+              envVariables={envVariables}
+              setEnvVariables={setEnvVariables}
+            />
+          </Panel>
+          <Panel>
+            <PanelHeader>{t('Write your Code Below')}</PanelHeader>
             <PanelBody>
               <Editor
                 height="40vh"
@@ -109,15 +205,26 @@ function SentryFunctionDetails(props: Props) {
   );
 }
 
-type WrapperState = {} & AsyncComponent['state'];
+type WrapperState = {
+  sentryFunction?: SentryFunction;
+} & AsyncComponent['state'];
 
 type WrapperProps = {
   params: {orgId: string; functionSlug?: string};
 } & AsyncComponent['props'];
 
 class SentryFunctionsWrapper extends AsyncComponent<WrapperProps, WrapperState> {
+  getEndpoints(): ReturnType<AsyncComponent['getEndpoints']> {
+    const {functionSlug, orgId} = this.props.params;
+    if (functionSlug) {
+      return [['sentryFunction', `/organizations/${orgId}/functions/${functionSlug}/`]];
+    }
+    return [];
+  }
   renderBody() {
-    return <SentryFunctionDetails {...this.props} />;
+    return (
+      <SentryFunctionDetails sentryFunction={this.state.sentryFunction} {...this.props} />
+    );
   }
 }
 

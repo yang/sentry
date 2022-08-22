@@ -2,14 +2,20 @@ import {createContext, useContext, useEffect, useState} from 'react';
 
 import {addErrorMessage} from 'sentry/actionCreators/indicator';
 import {Client} from 'sentry/api';
+import {normalizeDateTimeParams} from 'sentry/components/organizations/pageFilters/parse';
 import {t} from 'sentry/locale';
 import {Organization, PageFilters, Release} from 'sentry/types';
 import handleXhrErrorResponse from 'sentry/utils/handleXhrErrorResponse';
 
 import useApi from '../useApi';
 
-function fetchReleases(api: Client, orgSlug: string, selection: PageFilters) {
-  const {environments, projects} = selection;
+function fetchReleases(
+  api: Client,
+  orgSlug: string,
+  selection: PageFilters,
+  search: string
+) {
+  const {environments, projects, datetime} = selection;
 
   return api.requestPromise(`/organizations/${orgSlug}/releases/`, {
     method: 'GET',
@@ -18,6 +24,8 @@ function fetchReleases(api: Client, orgSlug: string, selection: PageFilters) {
       project: projects,
       per_page: 50,
       environment: environments,
+      query: search,
+      ...normalizeDateTimeParams(datetime),
     },
   });
 }
@@ -37,7 +45,12 @@ function ReleasesProvider({
 }: ReleasesProviderProps) {
   const api = useApi();
   const [releases, setReleases] = useState<Release[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  function handleSearch(search: string) {
+    setSearchTerm(search);
+  }
 
   useEffect(() => {
     if (skipLoad) {
@@ -47,7 +60,7 @@ function ReleasesProvider({
 
     let shouldCancelRequest = false;
     setLoading(true);
-    fetchReleases(api, organization.slug, selection)
+    fetchReleases(api, organization.slug, selection, searchTerm)
       .then(response => {
         if (shouldCancelRequest) {
           setLoading(false);
@@ -71,10 +84,10 @@ function ReleasesProvider({
       shouldCancelRequest = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skipLoad, api, organization.slug, JSON.stringify(selection)]);
+  }, [skipLoad, api, organization.slug, JSON.stringify(selection), searchTerm]);
 
   return (
-    <ReleasesContext.Provider value={{releases, loading}}>
+    <ReleasesContext.Provider value={{releases, loading, onSearch: handleSearch}}>
       {children}
     </ReleasesContext.Provider>
   );
@@ -82,6 +95,13 @@ function ReleasesProvider({
 
 interface ReleasesContextValue {
   loading: boolean;
+  /**
+   * This is an action provided to consumers for them to update the current
+   * releases result set using a simple search query.
+   *
+   * Will always add new options into the store.
+   */
+  onSearch: (searchTerm: string) => void;
   releases: Release[];
 }
 

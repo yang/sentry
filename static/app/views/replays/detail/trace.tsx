@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import * as Sentry from '@sentry/react';
 
 import EmptyStateWarning from 'sentry/components/emptyStateWarning';
 import LoadingError from 'sentry/components/loadingError';
@@ -6,7 +7,6 @@ import LoadingIndicator from 'sentry/components/loadingIndicator';
 import {ALL_ACCESS_PROJECTS} from 'sentry/constants/pageFilters';
 import {t} from 'sentry/locale';
 import {Organization} from 'sentry/types';
-import type {EventTransaction} from 'sentry/types/event';
 import {getUtcDateString} from 'sentry/utils/dates';
 import {TableData} from 'sentry/utils/discover/discoverQuery';
 import EventView from 'sentry/utils/discover/eventView';
@@ -19,6 +19,7 @@ import {
 import useApi from 'sentry/utils/useApi';
 import {useRouteContext} from 'sentry/utils/useRouteContext';
 import TraceView from 'sentry/views/performance/traceDetails/traceView';
+import type {ReplayRecord} from 'sentry/views/replays/types';
 
 type State = {
   /**
@@ -45,8 +46,8 @@ type State = {
 };
 
 interface Props {
-  event: EventTransaction;
   organization: Organization;
+  replayRecord: ReplayRecord;
 }
 
 const INITIAL_STATE = Object.freeze({
@@ -57,21 +58,21 @@ const INITIAL_STATE = Object.freeze({
   traces: null,
 });
 
-export default function Trace({event, organization}: Props) {
+export default function Trace({replayRecord, organization}: Props) {
   const [state, setState] = useState<State>(INITIAL_STATE);
   const api = useApi();
 
   const {
     location,
-    params: {eventSlug, orgId},
+    params: {replaySlug, orgSlug},
   } = useRouteContext();
-  const [, eventId] = eventSlug.split(':');
+  const [, eventId] = replaySlug.split(':');
+
+  const start = getUtcDateString(replayRecord.startedAt.getTime());
+  const end = getUtcDateString(replayRecord.finishedAt.getTime());
 
   useEffect(() => {
     async function loadTraces() {
-      const start = getUtcDateString(event.startTimestamp * 1000);
-      const end = getUtcDateString(event.endTimestamp * 1000);
-
       const eventView = EventView.fromSavedQuery({
         id: undefined,
         name: `Traces in replay ${eventId}`,
@@ -88,18 +89,18 @@ export default function Trace({event, organization}: Props) {
       try {
         const [data, , resp] = await doDiscoverQuery<TableData>(
           api,
-          `/organizations/${orgId}/events/`,
+          `/organizations/${orgSlug}/events/`,
           eventView.getEventsAPIPayload(location)
         );
 
         const traceIds = data.data.map(({trace}) => trace).filter(trace => trace);
 
         // TODO(replays): Potential performance concerns here if number of traceIds is large
-        const traceDetails = await Promise.all(
+        const traceDetails = await Promise.allSettled(
           traceIds.map(traceId =>
             doDiscoverQuery(
               api,
-              `/organizations/${orgId}/events-trace/${traceId}/`,
+              `/organizations/${orgSlug}/events-trace/${traceId}/`,
               getTraceRequestPayload({
                 eventView: makeEventView({start, end}),
                 location,
@@ -108,12 +109,25 @@ export default function Trace({event, organization}: Props) {
           )
         );
 
+        const successfulTraceDetails = traceDetails
+          .map(settled => (settled.status === 'fulfilled' ? settled.value[0] : undefined))
+          .filter(Boolean);
+
+        if (successfulTraceDetails.length !== traceDetails.length) {
+          traceDetails.forEach(trace => {
+            if (trace.status === 'rejected') {
+              Sentry.captureMessage(trace.reason);
+            }
+          });
+        }
+
         setState(prevState => ({
           isLoading: false,
           error: null,
           traceEventView: eventView,
           pageLinks: resp?.getResponseHeader('Link') ?? prevState.pageLinks,
-          traces: traceDetails.flatMap(([trace]) => trace as TraceFullDetailed[]) || [],
+          traces:
+            successfulTraceDetails.flatMap(trace => trace as TraceFullDetailed[]) || [],
         }));
       } catch (err) {
         setState({
@@ -129,7 +143,7 @@ export default function Trace({event, organization}: Props) {
     loadTraces();
 
     return () => {};
-  }, [api, eventId, orgId, location, event.startTimestamp, event.endTimestamp]);
+  }, [api, eventId, orgSlug, location, start, end]);
 
   if (state.isLoading) {
     return <LoadingIndicator />;

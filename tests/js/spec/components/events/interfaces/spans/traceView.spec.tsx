@@ -14,7 +14,7 @@ import {spanTargetHash} from 'sentry/components/events/interfaces/spans/utils';
 import WaterfallModel from 'sentry/components/events/interfaces/spans/waterfallModel';
 import ProjectsStore from 'sentry/stores/projectsStore';
 import {EntryType, EventTransaction} from 'sentry/types';
-import * as QuickTraceContext from 'sentry/utils/performance/quickTrace/quickTraceContext';
+import {QuickTraceContext} from 'sentry/utils/performance/quickTrace/quickTraceContext';
 import QuickTraceQuery from 'sentry/utils/performance/quickTrace/quickTraceQuery';
 
 function initializeData(settings) {
@@ -138,7 +138,7 @@ describe('TraceView', () => {
 
     it('should expand grouped siblings when clicked, and then regroup when clicked again', async () => {
       // eslint-disable-next-line no-console
-      console.error = jest.fn();
+      jest.spyOn(console, 'error').mockImplementation(jest.fn());
 
       const data = initializeData({
         features: ['performance-autogroup-sibling-spans'],
@@ -734,9 +734,9 @@ describe('TraceView', () => {
     generateSampleSpan('browser', 'test5', 'f000000000000000', 'a000000000000000', event);
 
     event.measurements = {
-      'mark.fcp': {value: 1000},
-      'mark.fp': {value: 1050},
-      'mark.lcp': {value: 1100},
+      fcp: {value: 1000},
+      fp: {value: 1050},
+      lcp: {value: 1100},
     };
 
     const waterfallModel = new WaterfallModel(event);
@@ -758,9 +758,12 @@ describe('TraceView', () => {
     const event = generateSampleEvent();
     generateSampleSpan('browser', 'test1', 'b000000000000000', 'a000000000000000', event);
 
+    event.startTimestamp = 1;
+    event.endTimestamp = 100;
+
     event.measurements = {
-      'mark.fcp': {value: 1000},
-      'mark.lcp': {value: 200000000},
+      fcp: {value: 858.3002090454102, unit: 'millisecond'},
+      lcp: {value: 1000363.800048828125, unit: 'millisecond'},
     };
 
     const waterfallModel = new WaterfallModel(event);

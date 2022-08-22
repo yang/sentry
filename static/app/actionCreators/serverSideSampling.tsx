@@ -8,30 +8,50 @@ import handleXhrErrorResponse from 'sentry/utils/handleXhrErrorResponse';
 export function fetchSamplingSdkVersions({
   api,
   orgSlug,
+  projectID,
 }: {
   api: Client;
   orgSlug: Organization['slug'];
+  projectID: Project['id'];
 }): Promise<SamplingSdkVersion[]> {
   const {samplingDistribution} = ServerSideSamplingStore.getState();
+  const {startTimestamp, endTimestamp, project_breakdown} = samplingDistribution;
 
-  const projectIds = samplingDistribution.project_breakdown?.map(
-    projectBreakdown => projectBreakdown.project_id
-  );
+  if (!startTimestamp || !endTimestamp) {
+    ServerSideSamplingStore.setFetching(false);
+    ServerSideSamplingStore.loadSamplingSdkVersionsSuccess([]);
+    return new Promise(resolve => {
+      resolve([]);
+    });
+  }
+
+  const projectIds = [
+    projectID,
+    ...(project_breakdown?.map(projectBreakdown => projectBreakdown.project_id) ?? []),
+  ];
 
   const promise = api.requestPromise(
     `/organizations/${orgSlug}/dynamic-sampling/sdk-versions/`,
     {
       query: {
         project: projectIds,
-        statsPeriod: '24h',
+        start: startTimestamp,
+        end: endTimestamp,
       },
     }
   );
 
-  promise.then(ServerSideSamplingStore.loadSamplingSdkVersionsSuccess).catch(response => {
-    const errorMessage = t('Unable to fetch sampling sdk versions');
-    handleXhrErrorResponse(errorMessage)(response);
-  });
+  ServerSideSamplingStore.setFetching(true);
+
+  promise
+    .then(ServerSideSamplingStore.loadSamplingSdkVersionsSuccess)
+    .catch(response => {
+      const errorMessage = t('Unable to fetch sampling sdk versions');
+      handleXhrErrorResponse(errorMessage)(response);
+    })
+    .finally(() => {
+      ServerSideSamplingStore.setFetching(false);
+    });
 
   return promise;
 }
@@ -47,13 +67,10 @@ export function fetchSamplingDistribution({
 }): Promise<SamplingDistribution> {
   ServerSideSamplingStore.reset();
 
+  ServerSideSamplingStore.setFetching(true);
+
   const promise = api.requestPromise(
-    `/projects/${orgSlug}/${projSlug}/dynamic-sampling/distribution/`,
-    {
-      query: {
-        statsPeriod: '24h',
-      },
-    }
+    `/projects/${orgSlug}/${projSlug}/dynamic-sampling/distribution/`
   );
 
   promise
@@ -61,6 +78,9 @@ export function fetchSamplingDistribution({
     .catch(response => {
       const errorMessage = t('Unable to fetch sampling distribution');
       handleXhrErrorResponse(errorMessage)(response);
+    })
+    .finally(() => {
+      ServerSideSamplingStore.setFetching(false);
     });
 
   return promise;
