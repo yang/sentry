@@ -495,6 +495,7 @@ from .endpoints.user_identity_config import (
 from .endpoints.user_identity_details import UserIdentityDetailsEndpoint
 from .endpoints.user_index import UserIndexEndpoint
 from .endpoints.user_ips import UserIPsEndpoint
+from .endpoints.user_last_organization import UserLastOrganization
 from .endpoints.user_notification_details import UserNotificationDetailsEndpoint
 from .endpoints.user_notification_fine_tuning import UserNotificationFineTuningEndpoint
 from .endpoints.user_notification_settings_details import UserNotificationSettingsDetailsEndpoint
@@ -737,6 +738,11 @@ urlpatterns = [
                     r"^(?P<user_id>[^\/]+)/emails/$",
                     UserEmailsEndpoint.as_view(),
                     name="sentry-api-0-user-emails",
+                ),
+                url(
+                    r"^(?P<user_id>[^\/]+)/last-organization/$",
+                    UserLastOrganization.as_view(),
+                    name="sentry-api-0-user-last-organization",
                 ),
                 url(
                     r"^(?P<user_id>[^\/]+)/emails/confirm/$",
