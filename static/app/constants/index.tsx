@@ -232,19 +232,21 @@ export const DEFAULT_PER_PAGE = 50;
 export const MAX_QUERY_LENGTH = 400;
 
 // Webpack configures DEPLOY_PREVIEW_CONFIG for deploy preview builds.
-export const DEPLOY_PREVIEW_CONFIG = process.env.DEPLOY_PREVIEW_CONFIG as unknown as
-  | undefined
-  | {
-      branch: string;
-      commitSha: string;
-      githubOrg: string;
-      githubRepo: string;
-    };
+export const DEPLOY_PREVIEW_CONFIG =
+  typeof process !== 'undefined' &&
+  (process.env.DEPLOY_PREVIEW_CONFIG as unknown as
+    | undefined
+    | {
+        branch: string;
+        commitSha: string;
+        githubOrg: string;
+        githubRepo: string;
+      });
 
 // Webpack configures EXPERIMENTAL_SPA.
-export const EXPERIMENTAL_SPA = process.env.EXPERIMENTAL_SPA as unknown as
-  | undefined
-  | boolean;
+export const EXPERIMENTAL_SPA =
+  typeof process !== 'undefined' &&
+  (process.env.EXPERIMENTAL_SPA as unknown as undefined | boolean);
 
 // so we don't use filtered values in certain display contexts
 // TODO(kmclb): once relay is doing the scrubbing, the masking value will be dynamic,
@@ -260,10 +262,10 @@ export const ORGANIZATION_FETCH_ERROR_TYPES = {
 export const CONFIG_DOCS_URL = 'https://develop.sentry.dev/config/';
 export const DISCOVER2_DOCS_URL = 'https://docs.sentry.io/product/discover-queries/';
 
-export const IS_ACCEPTANCE_TEST = !!process.env.IS_ACCEPTANCE_TEST;
-export const NODE_ENV = process.env.NODE_ENV;
-export const SPA_DSN = process.env.SPA_DSN;
-export const SENTRY_RELEASE_VERSION = process.env.SENTRY_RELEASE_VERSION;
+export const IS_ACCEPTANCE_TEST = false;
+export const NODE_ENV = 'dev';
+export const SPA_DSN = '';
+export const SENTRY_RELEASE_VERSION = '';
 
 export const DEFAULT_ERROR_JSON = {
   detail: t('Unknown error. Please try again.'),

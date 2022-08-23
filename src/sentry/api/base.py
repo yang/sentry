@@ -51,7 +51,13 @@ ONE_DAY = ONE_HOUR * 24
 
 LINK_HEADER = '<{uri}&cursor={cursor}>; rel="{name}"; results="{has_results}"; cursor="{cursor}"'
 
-DEFAULT_AUTHENTICATION = (TokenAuthentication, ApiKeyAuthentication, SessionAuthentication)
+
+class SentrySessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        pass
+
+
+DEFAULT_AUTHENTICATION = (TokenAuthentication, ApiKeyAuthentication, SentrySessionAuthentication)
 
 logger = logging.getLogger(__name__)
 audit_logger = logging.getLogger("sentry.audit.api")

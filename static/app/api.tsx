@@ -93,8 +93,8 @@ const globalErrorHandlers: ((resp: ResponseMeta) => boolean)[] = [];
 
 export const initApiClientErrorHandling = () =>
   globalErrorHandlers.push((resp: ResponseMeta) => {
-    const pageAllowsAnon = ALLOWED_ANON_PAGES.find(regex =>
-      regex.test(window.location.pathname)
+    const pageAllowsAnon = ALLOWED_ANON_PAGES.find(
+      regex => typeof window !== 'undefined' && regex.test(window.location.pathname)
     );
 
     // Ignore error unless it is a 401
@@ -120,7 +120,9 @@ export const initApiClientErrorHandling = () =>
 
     // If user must login via SSO, redirect to org login page
     if (code === 'sso-required') {
-      window.location.assign(extra.loginUrl);
+      if (typeof window !== 'undefined') {
+        window.location.assign(extra.loginUrl);
+      }
       return true;
     }
 
@@ -135,7 +137,9 @@ export const initApiClientErrorHandling = () =>
     if (EXPERIMENTAL_SPA) {
       browserHistory.replace('/auth/login/');
     } else {
-      window.location.reload();
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }
     return true;
   });
@@ -254,7 +258,7 @@ export class Client {
   activeRequests: Record<string, Request>;
 
   constructor(options: ClientOptions = {}) {
-    this.baseUrl = options.baseUrl ?? '/api/0';
+    this.baseUrl = options.baseUrl ?? 'http://localhost:8000/api/0';
     this.activeRequests = {};
   }
 
@@ -338,6 +342,7 @@ export class Client {
    * Consider using `requestPromise` for the async Promise version of this method.
    */
   request(path: string, options: Readonly<RequestOptions> = {}): Request {
+    console.log('make request');
     const method = options.method || (options.data ? 'POST' : 'GET');
 
     let fullUrl = buildRequestUrl(this.baseUrl, path, options.query);
@@ -432,12 +437,28 @@ export class Client {
 
     // Do not set the X-CSRFToken header when making a request outside of the
     // current domain
-    const absoluteUrl = new URL(fullUrl, window.location.origin);
-    const isSameOrigin = window.location.origin === absoluteUrl.origin;
+    const absoluteUrl =
+      typeof window !== 'undefined'
+        ? new URL(fullUrl, window.location.origin)
+        : new URL(fullUrl);
+    const isSameOrigin =
+      typeof window !== 'undefined'
+        ? window.location.origin === absoluteUrl.origin
+        : false;
 
     if (!csrfSafeMethod(method) && isSameOrigin) {
       headers.set('X-CSRFToken', getCsrfToken());
     }
+    // headers.set(
+    //   'COOKIE',
+    //   'sc=6YVPoZe6n3uLE2tfsd9bINZvvaQFl3Z6eywcELNwKJEI4htJ3WSj9rfKl9dlqYLy; session=.eJxVi08LgjAchr_LziHanM5uBVnHIILoMjb30w1tg_0xIvruTeji7eV9nueDmLGmA7RDp-u5kvNgrMhHtEGMx6BY9OCYlgkX60_wbgSzAA8muHcWg558tgjZ8cn1tE_r8JdWpeJepQwwbRoKdUUkYLGlALgnUta8wHmXl4JIui3Lvk-xj9KmAt80aR_ufomqTS_vgp7BuiEhZV8TOPT9AWwBRJY:1oQDBB:8g1ntUHO5yT3WtmNoe1fYKlxh8s; sentrysid=.eJxVj8sKwjAQRf8laymZPmLTnYIuRNwp6KbENGmDtZUm8UHpvzuBLnQ3nHvPMDOSUnjXlN6qoTQVKQiQxS-7CnlTXQis6tzwibwzrY1CIdrchWlXOK3n0p_ZCNugpjnNdQxU6SvoFLRIdSZEQulSpxyyGCBJZMJilK2v-mCY-r6vT6_L-bkMK60nxUjU-xGuYwxQyVKKianaGQHPIWaIXH9DdNwfGs7NVkq2Q-jnx6YFEdKZp-qHGgFe35HpC35LT1w:1oQDHe:LiTV6Evk2G-fwNraN4fyH_dRwts'
+    // );
+    // headers.set(
+    //   'SET-COOKIE',
+    //   'sc=6YVPoZe6n3uLE2tfsd9bINZvvaQFl3Z6eywcELNwKJEI4htJ3WSj9rfKl9dlqYLy; session=.eJxVi08LgjAchr_LziHanM5uBVnHIILoMjb30w1tg_0xIvruTeji7eV9nueDmLGmA7RDp-u5kvNgrMhHtEGMx6BY9OCYlgkX60_wbgSzAA8muHcWg558tgjZ8cn1tE_r8JdWpeJepQwwbRoKdUUkYLGlALgnUta8wHmXl4JIui3Lvk-xj9KmAt80aR_ufomqTS_vgp7BuiEhZV8TOPT9AWwBRJY:1oQDBB:8g1ntUHO5yT3WtmNoe1fYKlxh8s; sentrysid=.eJxVj8sKwjAQRf8laymZPmLTnYIuRNwp6KbENGmDtZUm8UHpvzuBLnQ3nHvPMDOSUnjXlN6qoTQVKQiQxS-7CnlTXQis6tzwibwzrY1CIdrchWlXOK3n0p_ZCNugpjnNdQxU6SvoFLRIdSZEQulSpxyyGCBJZMJilK2v-mCY-r6vT6_L-bkMK60nxUjU-xGuYwxQyVKKianaGQHPIWaIXH9DdNwfGs7NVkq2Q-jnx6YFEdKZp-qHGgFe35HpC35LT1w:1oQDHe:LiTV6Evk2G-fwNraN4fyH_dRwts'
+    // );
+
+    headers.forEach((header, value) => console.log({header, value}));
 
     const fetchRequest = fetch(fullUrl, {
       method,

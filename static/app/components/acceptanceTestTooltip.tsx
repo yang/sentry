@@ -18,8 +18,10 @@ class TooltipStore {
   tooltips = new Map<string, Tooltip>();
 
   constructor() {
-    window.__openAllTooltips = this.openAllTooltips;
-    window.__closeAllTooltips = this.closeAllTooltips;
+    if (typeof window !== 'undefined') {
+      window.__openAllTooltips = this.openAllTooltips;
+      window.__closeAllTooltips = this.closeAllTooltips;
+    }
   }
 
   /**

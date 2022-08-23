@@ -1,5 +1,4 @@
 import moment from 'moment';
-import {LocationRange} from 'pegjs';
 
 import {t} from 'sentry/locale';
 import {
@@ -8,11 +7,10 @@ import {
   measurementType,
 } from 'sentry/utils/discover/fields';
 
-import grammar from './grammar.pegjs';
 import {getKeyName} from './utils';
 
 type TextFn = () => string;
-type LocationFn = () => LocationRange;
+type LocationFn = () => any;
 
 type ListItem<V> = [
   space: ReturnType<TokenConverter['tokenSpaces']>,
@@ -809,12 +807,6 @@ const options = {
  * will result in null.
  */
 export function parseSearch(query: string): ParseResult | null {
-  try {
-    return grammar.parse(query, options);
-  } catch (e) {
-    // TODO(epurkhiser): Should we capture these errors somewhere?
-  }
-
   return null;
 }
 

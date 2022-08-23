@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from sentry import roles
 from sentry.api import client
+from sentry.api.base import allow_cors_options
 from sentry.api.bases.user import UserEndpoint
 from sentry.api.decorators import sudo_required
 from sentry.api.serializers import serialize
@@ -134,6 +135,7 @@ class UserDetailsEndpoint(UserEndpoint):
         """
         return Response(serialize(user, request.user, DetailedSelfUserSerializer()))
 
+    # @allow_cors_options
     def put(self, request: Request, user) -> Response:
         """
         Update Account Appearance options

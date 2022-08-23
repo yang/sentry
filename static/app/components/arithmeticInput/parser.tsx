@@ -1,8 +1,4 @@
-import {LocationRange} from 'pegjs';
-
 import {t} from 'sentry/locale';
-
-import grammar from './grammar.pegjs';
 
 // This constant should stay in sync with the backend parser
 const MAX_OPERATORS = 10;
@@ -31,9 +27,9 @@ export class Operation {
 
 class Term {
   term: Expression;
-  location: LocationRange;
+  location: any;
 
-  constructor({term, location}: {location: LocationRange; term: Expression}) {
+  constructor({term, location}: {location: any; term: Expression}) {
     this.term = term;
     this.location = location;
   }
@@ -79,13 +75,13 @@ export class TokenConverter {
     return flatten(remaining);
   };
 
-  tokenField = (term: Expression, location: LocationRange): Expression => {
+  tokenField = (term: Expression, location: any): Expression => {
     const field = new Term({term, location});
     this.fields.push(field);
     return term;
   };
 
-  tokenFunction = (term: Expression, location: LocationRange): Expression => {
+  tokenFunction = (term: Expression, location: any): Expression => {
     const func = new Term({term, location});
     this.functions.push(func);
     return term;
@@ -118,10 +114,5 @@ type parseResult = {
 
 export function parseArithmetic(query: string): parseResult {
   const tc = new TokenConverter();
-  try {
-    const result = grammar.parse(query, {tc});
-    return {result, error: tc.errors[0], tc};
-  } catch (error) {
-    return {result: null, error: error.message, tc};
-  }
+  return {result: null, error: 'not working with remix yet', tc};
 }

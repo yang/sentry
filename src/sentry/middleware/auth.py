@@ -13,6 +13,7 @@ from sentry.utils.linksign import process_signature
 
 
 def get_user(request):
+    print("auth get_user", request)
     if not hasattr(request, "_cached_user"):
         user = auth_get_user(request)
         # If the user bound to this request matches a real user,
