@@ -8,8 +8,14 @@ import Link, {LinkProps} from 'sentry/components/links/link';
 import {Panel, PanelBody, PanelHeader} from 'sentry/components/panels';
 import SentryDocumentTitle from 'sentry/components/sentryDocumentTitle';
 import space from 'sentry/styles/space';
-import {Organization} from 'sentry/types';
+import {Organization, User} from 'sentry/types';
 import {Theme} from 'sentry/utils/theme';
+import {t} from 'sentry/locale';
+import UserAvatar from 'sentry/components/avatar/userAvatar';
+
+import {IconDocs, IconLock, IconStack, IconSupport} from 'sentry/icons';
+import OrganizationAvatar from 'sentry/components/avatar/organizationAvatar';
+
 import SettingsLayout from './settingsLayout';
 
 const LINKS = {
@@ -29,15 +35,196 @@ const HOME_ICON_SIZE = 56;
 
 type SettingsIndexProps = {
   organization: Organization;
+  user: User;
 };
 
-function SettingsIndex({organization, ...props}: SettingsIndexProps) {
+function SettingsIndex({organization, user, ...props}: SettingsIndexProps) {
+  const organizationSettingsUrl =
+    (organization && `/settings/${organization.slug}/`) || '';
+  const isSelfHosted = false;
+
+  const supportLinkProps = {
+    isSelfHosted,
+    organizationSettingsUrl,
+  };
+
+  const myAccount = (
+    <GridPanel>
+      <HomePanelHeader>
+        <HomeLinkIcon to="/settings/account/">
+          <UserAvatar user={user} size={HOME_ICON_SIZE} />
+          {t('My Account')}
+        </HomeLinkIcon>
+      </HomePanelHeader>
+
+      <HomePanelBody>
+        <h3>{t('Quick links')}:</h3>
+        <ul>
+          <li>
+            <HomeLink to="/settings/account/security/">
+              {t('Change my password')}
+            </HomeLink>
+          </li>
+          <li>
+            <HomeLink to="/settings/account/notifications/">
+              {t('Notification Preferences')}
+            </HomeLink>
+          </li>
+          <li>
+            <HomeLink to="/settings/account/">{t('Change my avatar')}</HomeLink>
+          </li>
+        </ul>
+      </HomePanelBody>
+    </GridPanel>
+  );
+
+  const orgSettings = (
+    <GridPanel>
+      {!organization && <LoadingIndicator overlay hideSpinner />}
+      <HomePanelHeader>
+        <HomeLinkIcon to={organizationSettingsUrl}>
+          {organization ? (
+            <OrganizationAvatar organization={organization} size={HOME_ICON_SIZE} />
+          ) : (
+            <HomeIconContainer color="green300">
+              <IconStack size="lg" />
+            </HomeIconContainer>
+          )}
+          <OrganizationName>
+            {organization ? organization.slug : t('No Organization')}
+          </OrganizationName>
+        </HomeLinkIcon>
+      </HomePanelHeader>
+
+      <HomePanelBody>
+        <h3>{t('Quick links')}:</h3>
+        <ul>
+          <li>
+            <HomeLink to={`${organizationSettingsUrl}projects/`}>
+              {t('Projects')}
+            </HomeLink>
+          </li>
+          <li>
+            <HomeLink to={`${organizationSettingsUrl}teams/`}>{t('Teams')}</HomeLink>
+          </li>
+          <li>
+            <HomeLink to={`${organizationSettingsUrl}members/`}>{t('Members')}</HomeLink>
+          </li>
+        </ul>
+      </HomePanelBody>
+    </GridPanel>
+  );
+
+  const documentation = (
+    <GridPanel>
+      <HomePanelHeader>
+        <ExternalHomeLinkIcon href={LINKS.DOCUMENTATION}>
+          <HomeIconContainer color="pink300">
+            <IconDocs size="lg" />
+          </HomeIconContainer>
+          {t('Documentation')}
+        </ExternalHomeLinkIcon>
+      </HomePanelHeader>
+
+      <HomePanelBody>
+        <h3>{t('Quick links')}:</h3>
+        <ul>
+          <li>
+            <ExternalHomeLink href={LINKS.DOCUMENTATION_QUICKSTART}>
+              {t('Quickstart Guide')}
+            </ExternalHomeLink>
+          </li>
+          <li>
+            <ExternalHomeLink href={LINKS.DOCUMENTATION_PLATFORMS}>
+              {t('Platforms & Frameworks')}
+            </ExternalHomeLink>
+          </li>
+          <li>
+            <ExternalHomeLink href={LINKS.DOCUMENTATION_CLI}>
+              {t('Sentry CLI')}
+            </ExternalHomeLink>
+          </li>
+        </ul>
+      </HomePanelBody>
+    </GridPanel>
+  );
+
+  const support = (
+    <GridPanel>
+      <HomePanelHeader>
+        <SupportLink icon {...supportLinkProps}>
+          <HomeIconContainer color="purple300">
+            <IconSupport size="lg" />
+          </HomeIconContainer>
+          {t('Support')}
+        </SupportLink>
+      </HomePanelHeader>
+
+      <HomePanelBody>
+        <h3>{t('Quick links')}:</h3>
+        <ul>
+          <li>
+            <SupportLink {...supportLinkProps}>
+              {isSelfHosted ? t('Community Forums') : t('Contact Support')}
+            </SupportLink>
+          </li>
+          <li>
+            <ExternalHomeLink href={LINKS.GITHUB_ISSUES}>
+              {t('Sentry on GitHub')}
+            </ExternalHomeLink>
+          </li>
+          <li>
+            <ExternalHomeLink href={LINKS.SERVICE_STATUS}>
+              {t('Service Status')}
+            </ExternalHomeLink>
+          </li>
+        </ul>
+      </HomePanelBody>
+    </GridPanel>
+  );
+
+  const apiKeys = (
+    <GridPanel>
+      <HomePanelHeader>
+        <HomeLinkIcon to={LINKS.API}>
+          <HomeIconContainer>
+            <IconLock size="lg" isSolid />
+          </HomeIconContainer>
+          {t('API Keys')}
+        </HomeLinkIcon>
+      </HomePanelHeader>
+
+      <HomePanelBody>
+        <h3>{t('Quick links')}:</h3>
+        <ul>
+          <li>
+            <HomeLink to={LINKS.API}>{t('Auth Tokens')}</HomeLink>
+          </li>
+          <li>
+            <HomeLink to={`${organizationSettingsUrl}developer-settings/`}>
+              {t('Your Integrations')}
+            </HomeLink>
+          </li>
+          <li>
+            <ExternalHomeLink href={LINKS.DOCUMENTATION_API}>
+              {t('Documentation')}
+            </ExternalHomeLink>
+          </li>
+        </ul>
+      </HomePanelBody>
+    </GridPanel>
+  );
+
   return (
     <SentryDocumentTitle
       title={organization ? `${organization.slug} Settings` : 'Settings'}
     >
       <SettingsLayout {...props}>
-        <GridLayout>Stuff</GridLayout>
+        <GridLayout>
+          {orgSettings}
+          {documentation}
+          {support}
+        </GridLayout>
       </SettingsLayout>
     </SentryDocumentTitle>
   );

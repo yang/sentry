@@ -11,7 +11,8 @@ interface Props extends SVGIconProps {
 }
 
 const IconChevron = forwardRef<SVGSVGElement, Props>(
-  ({isCircled = false, direction = 'up', ...props}, ref) => {
+  ({isCircled = false, direction = 'right', ...props}, ref) => {
+    console.log({direction});
     return (
       <SvgIcon
         {...props}

@@ -1,16 +1,12 @@
 import styled from '@emotion/styled';
+import capitalize from 'lodash/capitalize';
 
 import Link from 'sentry/components/links/link';
-import getRouteStringFromRoutes from 'sentry/utils/getRouteStringFromRoutes';
-import recreateRoute from 'sentry/utils/recreateRoute';
 import Crumb from 'sentry/views/settings/components/settingsBreadcrumb/crumb';
 import Divider from 'sentry/views/settings/components/settingsBreadcrumb/divider';
 import OrganizationCrumb from 'sentry/views/settings/components/settingsBreadcrumb/organizationCrumb';
 import ProjectCrumb from 'sentry/views/settings/components/settingsBreadcrumb/projectCrumb';
 import TeamCrumb from 'sentry/views/settings/components/settingsBreadcrumb/teamCrumb';
-
-import {useBreadcrumbsPathmap} from './context';
-import {RouteWithName} from './types';
 
 const MENUS = {
   Organization: OrganizationCrumb,
@@ -19,50 +15,36 @@ const MENUS = {
 } as const;
 
 type Props = {
-  params: {[param: string]: string | undefined};
-  route: any;
-  routes: RouteWithName[];
+  url: string;
   className?: string;
 };
 
-function SettingsBreadcrumb({className, routes, params}: Props) {
-  const pathMap = useBreadcrumbsPathmap();
-
-  const lastRouteIndex = routes.map(r => !!r.name).lastIndexOf(true);
-  console.log({pathMap});
+function SettingsBreadcrumb({className, url}: Props) {
+  console.log({url});
+  const {pathname} = new URL(url);
+  const splitPath = pathname.split('/').filter(item => !!item);
 
   return (
     <Breadcrumbs className={className}>
-      {routes.map((route, i) => {
-        if (!route.name) {
-          return null;
-        }
-        const pathTitle = pathMap[getRouteStringFromRoutes(routes.slice(0, i + 1))];
-        const isLast = i === lastRouteIndex;
-        const createMenu = MENUS[route.name];
+      {splitPath.map((item, i) => {
+        const pathTitle = capitalize(item.replaceAll('-', ' '));
+        const isLast = i === splitPath.length - 1;
+        const createMenu = MENUS[pathTitle];
         const Menu = typeof createMenu === 'function' && createMenu;
         const hasMenu = !!Menu;
+        const thisPath = '/' + splitPath.slice(0, i + 1).join('/');
+        console.log({pathTitle, isLast, thisPath, hasMenu});
 
         const CrumbItem = hasMenu
           ? Menu
           : () => (
               <Crumb>
-                <CrumbLink to={recreateRoute(route, {routes, params})}>
-                  {pathTitle || route.name}{' '}
-                </CrumbLink>
+                <CrumbLink to={thisPath}>{pathTitle} </CrumbLink>
                 <Divider isLast={isLast} />
               </Crumb>
             );
 
-        return (
-          <CrumbItem
-            key={`${route.name}:${route.path}`}
-            routes={routes}
-            params={params}
-            route={route}
-            isLast={isLast}
-          />
-        );
+        return <CrumbItem key={`${thisPath}`} isLast={isLast} />;
       })}
     </Breadcrumbs>
   );

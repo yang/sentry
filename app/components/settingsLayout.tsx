@@ -1,20 +1,20 @@
-import {isValidElement, useEffect, useRef, useState} from 'react';
-import {browserHistory, RouteComponentProps} from 'react-router';
+import {useEffect, useRef, useState} from 'react';
+import {browserHistory} from 'react-router';
 import styled from '@emotion/styled';
 
 import Button from 'sentry/components/button';
 import {IconClose, IconMenu} from 'sentry/icons';
 import {t} from 'sentry/locale';
 import {fadeIn, slideInLeft} from 'sentry/styles/animations';
-import {PageContent} from 'sentry/styles/organization';
 import space from 'sentry/styles/space';
-
-import SettingsBreadcrumb from 'sentry/views/settings/components/settingsBreadcrumb';
 import SettingsHeader from 'sentry/views/settings/components/settingsHeader';
 import SettingsSearch from 'sentry/views/settings/components/settingsSearch';
 
+import SettingsBreadcrumb from './settingsBreadcrumb';
+
 type Props = {
-  children: React.ReactNode;
+  url: string;
+  children?: React.ReactNode;
   renderNavigation?: () => React.ReactNode;
 };
 
@@ -40,16 +40,14 @@ function SettingsLayout(props: Props) {
     setNavVisible(visible);
     setNavOffsetTop(headerRef.current?.getBoundingClientRect().bottom ?? 0);
   }
+  console.log({props});
 
   // Close menu when navigating away
   useEffect(() => browserHistory.listen(() => toggleNav(false)), []);
 
-  const {renderNavigation, children, params, routes, route} = props;
+  const {renderNavigation, children} = props;
 
   // We want child's view's props
-  const childProps = children && isValidElement(children) ? children.props : props;
-  const childRoutes = childProps.routes || routes || [];
-  const childRoute = childProps.route || route || {};
   const shouldRenderNavigation = typeof renderNavigation === 'function';
 
   return (
@@ -64,11 +62,7 @@ function SettingsLayout(props: Props) {
               onClick={() => toggleNav(!navVisible)}
             />
           )}
-          {/* <StyledSettingsBreadcrumb
-            params={params}
-            routes={childRoutes}
-            route={childRoute}
-          /> */}
+          <StyledSettingsBreadcrumb {...props} />
           <SettingsSearch />
         </HeaderContent>
       </SettingsHeader>
@@ -166,14 +160,6 @@ const Content = styled('div')`
   flex: 1;
   padding: ${space(4)};
   min-width: 0; /* keep children from stretching container */
-
-  /**
-   * PageContent is not normally used in settings but <PermissionDenied /> uses it under the hood.
-   * This prevents double padding.
-   */
-  ${PageContent} {
-    padding: 0;
-  }
 `;
 
 export default SettingsLayout;
