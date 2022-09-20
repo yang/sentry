@@ -30,6 +30,7 @@ function LazyLoad<C extends ComponentType>({component, ...props}: Props<C>) {
     () => lazy(() => retryableImport(component)),
     [component]
   );
+  console.log({component});
 
   return (
     <ErrorBoundary>

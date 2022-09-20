@@ -1,4 +1,4 @@
-import {Fragment} from 'react';
+import {Fragment, useEffect} from 'react';
 import {
   IndexRedirect,
   IndexRoute as BaseIndexRoute,
@@ -27,8 +27,11 @@ import ProjectEventRedirect from 'sentry/views/projectEventRedirect';
 import redirectDeprecatedProjectRoute from 'sentry/views/projects/redirectDeprecatedProjectRoute';
 import RouteNotFound from 'sentry/views/routeNotFound';
 import SettingsWrapper from 'sentry/views/settings/components/settingsWrapper';
+import {trackAnalyticsEventV2} from 'sentry/utils/analytics';
+import useOrganization from 'sentry/utils/useOrganization';
 
 import Feature from './components/acl/feature';
+import {Route as AnalyticsRoute} from './components/route';
 
 type CustomProps = {
   name?: string;
@@ -68,6 +71,30 @@ export function makeLazyloadComponent<C extends ComponentType>(
 
 // Shorthand to avoid extra line wrapping
 const make = makeLazyloadComponent;
+
+function makeWithAnalytics<C extends ComponentType>(
+  resolve: () => PromisedImport<C>,
+  getAnalyticsParams?: (props) => Record<string, any>
+) {
+  // XXX: Assign the component to a variable so it has a displayname
+  const RouteLazyLoad: React.FC<React.ComponentProps<C>> = props => {
+    const params = getAnalyticsParams?.(props) || {};
+    const organization = useOrganization();
+    const title = props.name || window.document.title;
+    useEffect(() => {
+      trackAnalyticsEventV2({
+        eventKey: `Page Load: ${title}`, // TODO: figure out what to do with Reload
+        eventName: `Page Load: ${title}`,
+        organization,
+        ...params,
+        // TODO: add in getsentry hook
+      });
+    }, []);
+    return <SafeLazyLoad {...props} component={resolve} />;
+  };
+
+  return RouteLazyLoad;
+}
 
 function buildRoutes() {
   // Read this to understand where to add new routes, how / why the routing
@@ -641,9 +668,14 @@ function buildRoutes() {
         <Route
           path=":memberId/"
           name={t('Details')}
-          component={make(
+          component={makeWithAnalytics(
             () =>
-              import('sentry/views/settings/organizationMembers/organizationMemberDetail')
+              import(
+                'sentry/views/settings/organizationMembers/organizationMemberDetail'
+              ),
+            props => {
+              return {testParam: 'test'};
+            }
           )}
         />
       </Route>
@@ -1898,7 +1930,7 @@ function buildRoutes() {
   );
 
   const appRoutes = (
-    <Route>
+    <AnalyticsRoute>
       {experimentalSpaRoutes}
       <Route path="/" component={errorHandler(App)}>
         {rootRoutes}
@@ -1907,8 +1939,10 @@ function buildRoutes() {
         {hook('routes')}
         <Route path="*" component={errorHandler(RouteNotFound)} />
       </Route>
-    </Route>
+    </AnalyticsRoute>
   );
+
+  console.log('building stuff');
 
   return appRoutes;
 }
