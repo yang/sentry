@@ -32,10 +32,6 @@ type Props = {
   source?: EventDetailPageSource;
 };
 
-function isNotMarkMeasurement(field: string) {
-  return !field.startsWith('mark.');
-}
-
 export default function EventCustomPerformanceMetrics({
   event,
   location,
@@ -44,7 +40,6 @@ export default function EventCustomPerformanceMetrics({
 }: Props) {
   const measurementNames = Object.keys(event.measurements ?? {})
     .filter(name => isCustomMeasurement(`measurements.${name}`))
-    .filter(isNotMarkMeasurement)
     .sort();
 
   if (measurementNames.length === 0) {
