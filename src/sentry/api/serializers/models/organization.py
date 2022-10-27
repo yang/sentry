@@ -233,6 +233,8 @@ class OrganizationSerializer(Serializer):  # type: ignore
         ):
             feature_list.remove("onboarding")
 
+        feature_list.add("onboarding")
+
         # Include api-keys feature if they previously had any api-keys
         if "api-keys" not in feature_list and ApiKey.objects.filter(organization=obj).exists():
             feature_list.add("api-keys")

@@ -14,6 +14,16 @@ type Props = {
 function ProgressHeader({allTasks, completedTasks}: Props) {
   const theme = useTheme();
 
+  let title, description;
+  const walkthrough = localStorage.getItem('new-walkthrough');
+  if (walkthrough === '1') {
+    title = 'Guided Tours';
+    description = 'Take a guided tour to see what Sentry can do for you';
+  } else {
+    title = 'Quick Start';
+    description = 'Walk through this guide to get the most out of Sentry right away.';
+  }
+
   return (
     <Container>
       <StyledProgressRing
@@ -29,10 +39,8 @@ function ProgressHeader({allTasks, completedTasks}: Props) {
           color: ${theme.textColor};
         `}
       />
-      <HeaderTitle>{t('Quick Start')}</HeaderTitle>
-      <Description>
-        {t('Walk through this guide to get the most out of Sentry right away.')}
-      </Description>
+      <HeaderTitle>{t(title)}</HeaderTitle>
+      <Description>{t(description)}</Description>
     </Container>
   );
 }

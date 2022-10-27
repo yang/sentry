@@ -128,12 +128,21 @@ function Sidebar({location, organization}: Props) {
     organization,
   };
 
+  const walkthrough = localStorage.getItem('new-walkthrough') === '1';
+  const sidebarAnchor = walkthrough ? (
+    <GuideAnchor target="projects" disabled={!localStorage.getItem('sidebarGuide')}>
+      {t('Projects')}
+    </GuideAnchor>
+  ) : (
+    <GuideAnchor target="projects">{t('Projects')}</GuideAnchor>
+  );
+
   const projects = hasOrganization && (
     <SidebarItem
       {...sidebarItemProps}
       index
       icon={<IconProject size="md" />}
-      label={<GuideAnchor target="projects">{t('Projects')}</GuideAnchor>}
+      label={sidebarAnchor}
       to={`/organizations/${organization.slug}/projects/`}
       id="projects"
     />

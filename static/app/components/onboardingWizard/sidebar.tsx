@@ -52,8 +52,11 @@ Heading.defaultProps = {
   transition: testableTransition(),
 };
 
+const completeNowText =
+  localStorage.getItem('new-walkthrough') === '1' ? 'Sentry Basics' : 'Next Steps';
+
 const customizedTasksHeading = <Heading key="customized">{t('The Basics')}</Heading>;
-const completeNowHeading = <Heading key="now">{t('Next Steps')}</Heading>;
+const completeNowHeading = <Heading key="now">{t(completeNowText)}</Heading>;
 const upcomingTasksHeading = (
   <Heading key="upcoming">
     <Tooltip
