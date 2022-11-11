@@ -111,6 +111,10 @@ class ReleaseFile(Model):
 
     @classmethod
     def get_ident(cls, name, dist=None):
+        """
+        Get the file's unique identifier, which is a hash of either the name or
+        the name and dist, depending on whether or not the dist exists.
+        """
         if dist is not None:
             return sha1_text(name + "\x00\x00" + dist).hexdigest()
         return sha1_text(name).hexdigest()
@@ -132,6 +136,7 @@ class ReleaseFile(Model):
         uri_without_query = (scheme, netloc, path, "", "")
         uri_relative_without_query = ("", "", path, "", "")
 
+        # added in this specific order to indicate priority if more than one matches
         urls = [urlunsplit(uri_without_fragment)]
         if query:
             urls.append(urlunsplit(uri_without_query))

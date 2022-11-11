@@ -43,7 +43,7 @@ type State = {
 
 class ErrorItem extends React.Component<Props, State> {
   state: State = {
-    isOpen: false,
+    isOpen: true,
   };
 
   shouldComponentUpdate(_nextProps: Props, nextState: State) {

@@ -22,6 +22,11 @@ StacktraceInfo.__ne__ = lambda a, b: a is not b
 
 
 class ProcessableFrame:
+    """
+    A frame which knows which processor it needs, knows its location in the
+    stack, and can walk backwards in said stack.
+    """
+
     def __init__(self, frame, idx, processor, stacktrace_info, processable_frames):
         self.frame = frame
         self.idx = idx
@@ -78,9 +83,18 @@ class ProcessableFrame:
         return rv
 
 
+# TODO (kmclb) in what sense is this a "task?"
 class StacktraceProcessingTask:
+    """
+    Container holding frames to be processed, grouped by both stacktrace and processor.
+    """
+
     def __init__(self, processable_stacktraces, processors):
+        # the same set of frames is in each of the arguments, just grouped differently
+
+        # a dictionary of the form `stacktraceInfo -> list of ProcessableFrame objects`
         self.processable_stacktraces = processable_stacktraces
+        # a dictionary of the form `processor -> list of ProcessableFrame objects`
         self.processors = processors
 
     def close(self):
@@ -94,6 +108,11 @@ class StacktraceProcessingTask:
         return self.processable_stacktraces.items()
 
     def iter_processable_frames(self, processor=None):
+        """
+        Iterate over the frames in all stacktraces, optionally filtering by
+        processor.
+        """
+        # the data we're ignoring here is a StacktraceInfo tuple
         for _, frames in self.iter_processable_stacktraces():
             for frame in frames:
                 if processor is None or frame.processor == processor:
@@ -195,7 +214,7 @@ def find_stacktraces_in_data(data, include_raw=False, with_exceptions=False):
     for exc in get_path(data, "exception", "values", filter=True, default=()):
         _report_stack(exc.get("stacktrace"), exc, is_exception=with_exceptions)
 
-    _report_stack(data.get("stacktrace"), None)
+    _report_stack(data.get("stacktrace"), data)
 
     for thread in get_path(data, "threads", "values", filter=True, default=()):
         _report_stack(thread.get("stacktrace"), thread)
@@ -336,8 +355,9 @@ def get_processors_for_stacktraces(data, infos):
 
 
 def get_processable_frames(stacktrace_info, processors):
-    """Returns thin wrappers around the frames in a stacktrace associated
-    with the processor for it.
+    """
+    Returns thin wrappers around the frames in a stacktrace, associating each
+    one with its processor.
     """
     frames = get_path(stacktrace_info.stacktrace, "frames", filter=True, default=())
     frame_count = len(frames)
@@ -359,11 +379,17 @@ def process_single_stacktrace(processing_task, stacktrace_info, processable_fram
     processed_frames = []
     all_errors = []
 
+    # safely extract the frames from the stacktrace
     bare_frames = get_path(stacktrace_info.stacktrace, "frames", filter=True, default=())
     frame_count = len(bare_frames)
+
+    # index ProcessableFrame objects by their frame's location in the stacktrace
     processable_frames = {frame.idx: frame for frame in processable_frames}
 
     for i, bare_frame in enumerate(bare_frames):
+        # subtract one because length is 1-based and enumeration is 0-based;
+        # count down because the frame indices in processable_frames are ordered
+        # in reverse compared to the frames in the stacktrace
         idx = frame_count - i - 1
         rv = None
 
@@ -371,6 +397,8 @@ def process_single_stacktrace(processing_task, stacktrace_info, processable_fram
             processable_frame = processable_frames[idx]
             assert processable_frame.frame is bare_frame
             try:
+                # do the actual processing, collecting errors associated with
+                # that frame along the way
                 rv = processable_frame.processor.process_frame(processable_frame, processing_task)
             except Exception:
                 logger.exception("Failed to process frame")
@@ -381,6 +409,8 @@ def process_single_stacktrace(processing_task, stacktrace_info, processable_fram
             processed_frames.extend(expand_processed)
             changed_processed = True
         elif expand_raw:  # is not empty
+            # if the processing didn't do anything besides add context lines, at
+            # least use that
             processed_frames.extend(expand_raw)
             changed_processed = True
         else:
@@ -448,8 +478,11 @@ def lookup_frame_cache(keys):
 
 
 def get_stacktrace_processing_task(infos, processors):
-    """Returns a list of all tasks for the processors.  This can skip over
-    processors that seem to not handle any frames.
+    """Return two indices: one grouping all processable frames by stacktrace,
+    the other grouping them all by processor.
+
+    `infos` is a list of StacktraceInfo tuples, each containing a stacktrace
+    along with some metadata.
     """
     by_processor = {}
     to_lookup = {}
@@ -460,9 +493,12 @@ def get_stacktrace_processing_task(infos, processors):
     by_stacktrace_info = OrderedDict()
 
     for info in infos:
+        # these aren't just frames which are processable - they're actual
+        # ProcessableFrame objects
         processable_frames = get_processable_frames(info, processors)
         for processable_frame in processable_frames:
             processable_frame.processor.preprocess_frame(processable_frame)
+            # group frames both by processor and parent stacktrace
             by_processor.setdefault(processable_frame.processor, []).append(processable_frame)
             by_stacktrace_info.setdefault(processable_frame.stacktrace_info, []).append(
                 processable_frame
@@ -480,7 +516,7 @@ def get_stacktrace_processing_task(infos, processors):
 
 
 def dedup_errors(errors):
-    # This operation scales bad but we do not expect that many items to
+    # This operation scales badly but we do not expect that many items to
     # end up in rv, so that should be okay enough to do.
     rv = []
     for error in errors:
@@ -490,6 +526,8 @@ def dedup_errors(errors):
 
 
 def process_stacktraces(data, make_processors=None, set_raw_stacktrace=True):
+    # infos is a list of StacktraceInfo tuples, each holding a stacktrace
+    # dictionary along with some metadata
     infos = find_stacktraces_in_data(data, with_exceptions=True)
     if make_processors is None:
         processors = get_processors_for_stacktraces(data, infos)
@@ -503,7 +541,7 @@ def process_stacktraces(data, make_processors=None, set_raw_stacktrace=True):
 
     changed = False
 
-    # Build a new processing task
+    # Group frames both by stacktrace and by processor
     processing_task = get_stacktrace_processing_task(infos, processors)
     try:
 
@@ -530,14 +568,22 @@ def process_stacktraces(data, make_processors=None, set_raw_stacktrace=True):
                             changed = True
                             span.set_data("data_changed", True)
 
-            # If the stacktrace is empty we skip it for processing
+            # If the stacktrace is empty, there's nothing to process, so move on
             if not stacktrace_info.stacktrace:
                 continue
+
             with sentry_sdk.start_span(
                 op="stacktraces.processing.process_stacktraces.process_single_stacktrace"
             ) as span:
                 new_frames, new_raw_frames, errors = process_single_stacktrace(
-                    processing_task, stacktrace_info, processable_frames
+                    # an index of all frames (not just those from this
+                    # stacktrace), grouped both by stacktrace and processor
+                    processing_task,
+                    # the stacktrace and stacktrace metadata
+                    stacktrace_info,
+                    # all frames from the stacktrace, each associated with a
+                    # processer and a location in the stack
+                    processable_frames,
                 )
                 if new_frames is not None:
                     stacktrace_info.stacktrace["frames"] = new_frames

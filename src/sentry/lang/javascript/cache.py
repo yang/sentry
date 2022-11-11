@@ -69,8 +69,8 @@ class SourceMapCache:
     """
 
     def __init__(self):
-        self._cache = {}
-        self._mapping = {}
+        self._cache = {}  # sourcemap URL -> sourcemap contents
+        self._mapping = {}  # bundle URL -> sourcemap URL
 
     def __contains__(self, sourcemap_url):
         return sourcemap_url in self._cache

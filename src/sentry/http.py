@@ -122,7 +122,7 @@ def expose_url(url):
 
 
 def get_domain_key(url):
-    domain = urlparse(url).netloc
+    domain = urlparse(url).netloc  # a.k.a. hostname
     return f"source:blacklist:v2:{md5_text(domain).hexdigest()}"
 
 
@@ -225,7 +225,10 @@ def fetch_file(
                     }
                 else:
                     logger.exception(f"{exc}")
-                    error = {"type": EventError.UNKNOWN_ERROR}
+                    error = {
+                        "type": EventError.UNKNOWN_ERROR,
+                        "value": f"{type(exc)}",
+                    }
 
                 # TODO(dcramer): we want to be less aggressive on disabling domains
                 if domain_lock_enabled:

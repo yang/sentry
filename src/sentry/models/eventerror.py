@@ -121,6 +121,11 @@ class EventError:
         PROGUARD_MISSING_MAPPING: "A proguard mapping file was missing",
         PROGUARD_MISSING_LINENO: "A proguard mapping file does not contain line info",
     }
+
+    _phases = {
+        "fetch_file.precheck": "Matched file search: Precheck",
+        "fetch_file.web_scraping": "Matched file search: Web scraping",
+        "process_file.pre_check": "File processing: Precheck",
     }
 
     @classmethod
@@ -144,3 +149,43 @@ class EventError:
 
     def get_api_context(self):
         return {"type": self.type, "message": self.message, "data": self.data}
+
+
+def summarize_js_errors(errors):
+
+    errors_by_type = {}
+    errors_by_type = (
+        errors_by_type.set_default(err.type, []) for err in errors if err.type.startswith("js")
+    )
+
+
+def get_js_error_type_metadata(error_type, errors_by_type):
+    metadata = {
+        EventError.JS_GENERIC_FETCH_ERROR: {"phase": ""},
+        EventError.JS_RESTRICTED_IP: {"phase": "", "hint": ""},
+        EventError.JS_SECURITY_VIOLATION: {"phase": "", "hint": ""},
+        EventError.JS_TRUNCATED_URL: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_URL: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_HTTP_CODE: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_CONTENT: {"phase": "", "hint": ""},
+        EventError.JS_NO_COLUMN: {},  # deprecated
+        EventError.JS_MISSING_ROW_OR_COLUMN: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_ROW_OR_COLUMN: {"phase": "", "hint": ""},
+        EventError.JS_MISSING_SOURCE: {"phase": "", "hint": ""},
+        EventError.JS_MISSING_MINIFIED_SOURCE: {"phase": "", "hint": ""},
+        EventError.JS_MISSING_ORIGINAL_SOURCE: {
+            "phase": "",
+            "hint": "Make sure your sourcemaps include a `sourcesContent` entry.",
+        },
+        EventError.JS_INVALID_SOURCEMAP: {"phase": "", "hint": ""},
+        EventError.JS_TOO_MANY_REMOTE_SOURCES: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_SOURCE_ENCODING: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_SOURCEMAP_LOCATION: {"phase": "", "hint": ""},
+        EventError.JS_INVALID_STACKFRAME_LOCATION: {"phase": "", "hint": ""},
+        EventError.JS_TOO_LARGE: {},  # deprecated
+        EventError.JS_FETCH_TOO_LARGE: {"phase": "", "hint": ""},
+        EventError.JS_TOO_LARGE_FOR_CACHE: {"phase": "", "hint": ""},
+        EventError.JS_FETCH_TIMEOUT: {"phase": "", "hint": ""},
+        EventError.JS_SCRAPING_DISABLED: {"phase": "", "hint": ""},
+        EventError.JS_UNKNOWN_ERROR: {"phase": ""},
+    }
