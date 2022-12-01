@@ -29,11 +29,9 @@ from sentry.utils.performance_issues.performance_span_issue import PerformanceSp
 
 BASE_DETECTOR_OPTIONS = {
     "performance.issues.n_plus_one_db.problem-creation": 1.0,
-    "performance.issues.n_plus_one_db_ext.problem-creation": 1.0,
 }
 BASE_DETECTOR_OPTIONS_OFF = {
     "performance.issues.n_plus_one_db.problem-creation": 0.0,
-    "performance.issues.n_plus_one_db_ext.problem-creation": 0.0,
 }
 
 
@@ -117,7 +115,7 @@ class PerformanceDetectionTest(unittest.TestCase):
         assert perf_problems == []
 
     @override_options(BASE_DETECTOR_OPTIONS)
-    def test_n_plus_one_extended_detection_no_parent_span(self):
+    def test_n_plus_one_detection_no_parent_span(self):
         n_plus_one_event = EVENTS["n-plus-one-db-root-parent-span"]
         sdk_span_mock = Mock()
 
@@ -144,23 +142,6 @@ class PerformanceDetectionTest(unittest.TestCase):
                 ],
             )
         ]
-
-    @override_options(BASE_DETECTOR_OPTIONS)
-    def test_n_plus_one_extended_detection_matches_previous_group(self):
-        n_plus_one_event = EVENTS["n-plus-one-in-django-index-view"]
-        sdk_span_mock = Mock()
-
-        with override_options({"performance.issues.n_plus_one_db.problem-creation": 0.0}):
-            n_plus_one_extended_problems = _detect_performance_problems(
-                n_plus_one_event, sdk_span_mock
-            )
-
-        with override_options({"performance.issues.n_plus_one_db_ext.problem-creation": 0.0}):
-            n_plus_one_original_problems = _detect_performance_problems(
-                n_plus_one_event, sdk_span_mock
-            )
-
-        assert n_plus_one_original_problems == n_plus_one_extended_problems
 
     @override_options(BASE_DETECTOR_OPTIONS)
     def test_overlap_detector_problems(self):
