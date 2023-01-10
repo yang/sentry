@@ -1,0 +1,19 @@
+name: 'Python setup'
+description: 'configures python, install dependencies and cache virtual env'
+inputs:
+  python-version:
+    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax."
+    required: true
+  dependency-paths:
+    description: "Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies."
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984  # v4.3.0
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: ${{ inputs.dependency-paths }}
+    - name: Install dependencies
+      run: pip install -r ${{ inputs.dependency-paths }}
