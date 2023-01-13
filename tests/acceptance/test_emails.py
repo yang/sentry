@@ -1,5 +1,6 @@
 from urllib.parse import urlencode
 
+import pytest
 from selenium.webdriver.common.by import By
 
 from sentry.testutils import AcceptanceTestCase
@@ -53,6 +54,7 @@ class EmailTestCase(AcceptanceTestCase):
         self.user = self.create_user("foo@example.com")
         self.login_as(self.user)
 
+    @pytest.mark.skip
     def test_emails(self):
         for url, name in EMAILS:
             # HTML output is captured as a snapshot

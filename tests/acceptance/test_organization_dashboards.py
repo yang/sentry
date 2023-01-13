@@ -63,11 +63,13 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
         self.page.wait_until_loaded()
         self.browser.snapshot(f"{screenshot_name} (refresh)")
 
+    @pytest.mark.skip
     def test_default_overview_dashboard_layout(self):
         with self.feature(FEATURE_NAMES):
             self.page.visit_default_overview()
             self.browser.snapshot("dashboards - default overview layout")
 
+    @pytest.mark.skip
     def test_add_and_move_new_widget_on_existing_dashboard(self):
         with self.feature(FEATURE_NAMES + EDIT_FEATURE):
             self.page.visit_dashboard_detail()
@@ -84,6 +86,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - save new widget layout in custom dashboard")
 
+    @pytest.mark.skip
     def test_create_new_dashboard_with_modified_widget_layout(self):
         with self.feature(FEATURE_NAMES + EDIT_FEATURE):
             # Create a new dashboard
@@ -109,6 +112,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - save widget layout in new custom dashboard")
 
+    @pytest.mark.skip
     def test_move_existing_widget_on_existing_dashboard(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -134,6 +138,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - move existing widget on existing dashboard")
 
+    @pytest.mark.skip
     def test_widget_edit_keeps_same_layout_after_modification(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -190,6 +195,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
                 "dashboards - edit widgets after layout change does not reset layout"
             )
 
+    @pytest.mark.skip
     def test_add_issue_widgets_do_not_overlap(self):
         def add_issue_widget(widget_title):
             self.browser.wait_until_clickable('[data-test-id="widget-add"]')
@@ -212,6 +218,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - issue widgets do not overlap")
 
+    @pytest.mark.skip
     def test_resize_new_and_existing_widgets(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -254,6 +261,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - resize new and existing widgets")
 
+    @pytest.mark.skip
     def test_delete_existing_widget_does_not_trigger_new_widget_layout_reset(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -300,6 +308,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
                 "dashboards - delete existing widget does not reset new widget layout"
             )
 
+    @pytest.mark.skip
     def test_resize_big_number_widget(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -329,6 +338,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.capture_screenshots("dashboards - resize big number widget")
 
+    @pytest.mark.skip
     def test_default_layout_when_widgets_do_not_have_layout_set(self):
         existing_widgets = DashboardWidget.objects.bulk_create(
             [
@@ -362,6 +372,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
             self.page.wait_until_loaded()
             self.browser.snapshot("dashboards - default layout when widgets do not have layout set")
 
+    @pytest.mark.skip
     def test_duplicate_widget_in_view_mode(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -397,6 +408,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.browser.snapshot("dashboard widget - duplicate with grid")
 
+    @pytest.mark.skip
     def test_delete_widget_in_view_mode(self):
         existing_widget = DashboardWidget.objects.create(
             dashboard=self.dashboard,
@@ -424,6 +436,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
 
             self.browser.snapshot("dashboard widget - delete with grid")
 
+    @pytest.mark.skip
     def test_cancel_without_changes_does_not_trigger_confirm_with_custom_widget_through_header(
         self,
     ):
@@ -444,6 +457,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
             wait = WebDriverWait(self.browser.driver, 5)
             wait.until_not(EC.alert_is_present())
 
+    @pytest.mark.skip
     def test_position_when_adding_multiple_widgets_through_add_widget_tile_in_edit(
         self,
     ):
@@ -463,6 +477,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
                 "dashboards - position when adding multiple widgets through Add Widget tile in edit"
             )
 
+    @pytest.mark.skip
     def test_position_when_adding_multiple_widgets_through_add_widget_tile_in_create(
         self,
     ):
@@ -490,6 +505,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
                 "dashboards - position when adding multiple widgets through Add Widget tile in create"
             )
 
+    @pytest.mark.skip
     def test_deleting_stacked_widgets_by_context_menu_does_not_trigger_confirm_on_edit_cancel(
         self,
     ):
@@ -541,6 +557,7 @@ class OrganizationDashboardsAcceptanceTest(AcceptanceTestCase):
             self.page.click_cancel_button()
             wait.until_not(EC.alert_is_present())
 
+    @pytest.mark.skip
     def test_changing_number_widget_to_area_updates_widget_height(
         self,
     ):

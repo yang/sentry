@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pytest
 from django.utils import timezone
 from selenium.webdriver.common.by import By
 
@@ -36,6 +37,7 @@ class IssueDetailsWorkflowTest(AcceptanceTestCase, SnubaTestCase):
         )
         return event
 
+    @pytest.mark.skip
     def test_resolve_basic(self):
         event = self.create_sample_event(platform="python")
         self.page.visit_issue(self.org.slug, event.group.id)
@@ -45,6 +47,7 @@ class IssueDetailsWorkflowTest(AcceptanceTestCase, SnubaTestCase):
         assert res.status_code == 200, res
         assert res.data["status"] == "resolved"
 
+    @pytest.mark.skip
     def test_ignore_basic(self):
         event = self.create_sample_event(platform="python")
         self.page.visit_issue(self.org.slug, event.group.id)

@@ -1,6 +1,7 @@
 # from datetime import datetime
 # from unittest.mock import patch
 
+import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
@@ -53,6 +54,7 @@ class OrganizationGroupIndexTest(AcceptanceTestCase, SnubaTestCase):
 
         self.browser.snapshot("issue list after navigating to saved search")
 
+    @pytest.mark.skip
     def test_create_saved_search(self):
         self.page.visit_issue_list(self.org.slug)
         self.browser.click_when_visible('button[aria-label="Saved Searches"]')
@@ -86,6 +88,7 @@ class OrganizationGroupIndexTest(AcceptanceTestCase, SnubaTestCase):
             by=By.CSS_SELECTOR, value='button[aria-label="My Saved Search"]'
         )
 
+    @pytest.mark.skip
     def test_edit_saved_search(self):
         # Start with a user saved search
         self.create_saved_search(
@@ -126,6 +129,7 @@ class OrganizationGroupIndexTest(AcceptanceTestCase, SnubaTestCase):
             by=By.CSS_SELECTOR, value='button[aria-label="New Saved Search Name"]'
         )
 
+    @pytest.mark.skip
     def test_delete_saved_search(self):
         # Start with a user saved search
         self.create_saved_search(

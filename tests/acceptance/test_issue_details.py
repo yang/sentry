@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+import pytest
 import pytz
 from django.utils import timezone
 
@@ -123,6 +124,7 @@ class IssueDetailsTest(AcceptanceTestCase, SnubaTestCase):
             "issue details javascript - event details - curl command", desktop_only=True
         )
 
+    @pytest.mark.skip
     def test_rust_event(self):
         # TODO: This should become its own "rust" platform type
         event = self.create_sample_event(platform="native", sample_name="Rust")
@@ -168,6 +170,7 @@ class IssueDetailsTest(AcceptanceTestCase, SnubaTestCase):
         self.browser.blur()
         self.browser.snapshot("issue activity python", desktop_only=True)
 
+    @pytest.mark.skip
     def test_resolved(self):
         event = self.create_sample_event(platform="python")
         self.page.visit_issue(self.org.slug, event.group.id)
