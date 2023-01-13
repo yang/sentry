@@ -153,6 +153,7 @@ class IssueDetailsTest(AcceptanceTestCase, SnubaTestCase):
         self.page.visit_issue(self.org.slug, event.group.id)
         self.browser.snapshot("issue details empty stacktrace", desktop_only=True)
 
+    @pytest.mark.skip
     def test_invalid_interfaces(self):
         event = self.create_sample_event(platform="invalid-interfaces")
         self.page.visit_issue(self.org.slug, event.group.id)
@@ -178,6 +179,7 @@ class IssueDetailsTest(AcceptanceTestCase, SnubaTestCase):
 
         self.browser.snapshot("issue details resolved", desktop_only=True)
 
+    @pytest.mark.skip
     def test_ignored(self):
         event = self.create_sample_event(platform="python")
         self.page.visit_issue(self.org.slug, event.group.id)

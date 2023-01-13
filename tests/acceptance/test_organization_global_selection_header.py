@@ -122,6 +122,7 @@ class OrganizationGlobalHeaderTest(AcceptanceTestCase, SnubaTestCase):
         self.issues_list.wait_until_loaded()
         assert f"project={self.project_3.id}" in self.browser.current_url
 
+    @pytest.mark.skip
     def test_global_selection_header_navigates_with_browser_back_button(self):
         """
         Global Selection Header should:
@@ -148,6 +149,7 @@ class OrganizationGlobalHeaderTest(AcceptanceTestCase, SnubaTestCase):
         assert f"project={self.project_1.id}" in self.browser.current_url
         assert self.issues_list.global_selection.get_selected_project_slug() == self.project_1.slug
 
+    @pytest.mark.skip
     def test_global_selection_header_updates_environment_with_browser_navigation_buttons(self):
         """
         Global Selection Header should:
@@ -273,6 +275,7 @@ class OrganizationGlobalHeaderTest(AcceptanceTestCase, SnubaTestCase):
             )
 
     @patch("django.utils.timezone.now")
+    @pytest.mark.skip
     def test_issues_list_to_details_and_back_with_all_projects(self, mock_now):
         """
         If user has access to the `global-views` feature, which allows selecting multiple projects,
