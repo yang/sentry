@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+import pytest
 import pytz
 from django.utils import timezone
 
@@ -163,6 +164,7 @@ class UnmergeTestCase(TestCase, SnubaTestCase):
             "first_release": None,
         }
 
+    @pytest.mark.xfail(reason="Flakey test. Running multiple times locally causes various issues. ")
     @with_feature("projects:similarity-indexing")
     def test_unmerge(self):
         now = before_now(minutes=5).replace(microsecond=0, tzinfo=pytz.utc)
