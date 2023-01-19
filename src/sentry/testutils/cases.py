@@ -30,6 +30,7 @@ __all__ = (
     "ReplaysAcceptanceTestCase",
     "ReplaysSnubaTestCase",
     "MonitorTestCase",
+    "BaseTestCase",
 )
 import hashlib
 import inspect
@@ -227,7 +228,8 @@ class BaseTestCase(Fixtures):
         self.client.cookies[name] = value
         self.client.cookies[name].update({k.replace("_", "-"): v for k, v in params.items()})
 
-    def make_request(self, user=None, auth=None, method=None, is_superuser=False, path="/"):
+    @staticmethod
+    def make_request(user=None, auth=None, method=None, is_superuser=False, path="/"):
         request = HttpRequest()
         if method:
             request.method = method
@@ -237,7 +239,7 @@ class BaseTestCase(Fixtures):
         request.META["SERVER_PORT"] = 80
 
         # order matters here, session -> user -> other things
-        request.session = self.session
+        request.session = Factories.create_session()
         request.auth = auth
         request.user = user or AnonymousUser()
         # must happen after request.user/request.session is populated
@@ -251,13 +253,14 @@ class BaseTestCase(Fixtures):
 
     # TODO(dcramer): ideally superuser_sso would be False by default, but that would require
     # a lot of tests changing
-    @TimedRetryPolicy.wrap(timeout=5)
+    # @TimedRetryPolicy.wrap(timeout=5)
+    @staticmethod
     def login_as(
-        self, user, organization_id=None, organization_ids=None, superuser=False, superuser_sso=True
+        user, organization_id=None, organization_ids=None, superuser=False, superuser_sso=True
     ):
         user.backend = settings.AUTHENTICATION_BACKENDS[0]
 
-        request = self.make_request()
+        request = BaseTestCase.make_request()
         with exempt_from_silo_limits():
             login(request, user)
         request.user = user
@@ -288,7 +291,7 @@ class BaseTestCase(Fixtures):
             request.superuser.set_logged_in(request.user)
             # XXX(dcramer): awful hack to ensure future attempts to instantiate
             # the Superuser object are successful
-            self.save_cookie(
+            BaseTestCase.save_cookie(
                 name=SU_COOKIE_NAME,
                 value=signing.get_cookie_signer(salt=SU_COOKIE_NAME + SU_COOKIE_SALT).sign(
                     request.superuser.token
@@ -300,7 +303,7 @@ class BaseTestCase(Fixtures):
                 expires=None,
             )
         # Save the session values.
-        self.save_session()
+        # self.save_session()
 
     def load_fixture(self, filepath):
         with open(get_fixture_path(filepath), "rb") as fp:

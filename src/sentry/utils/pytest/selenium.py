@@ -27,38 +27,36 @@ logger = logging.getLogger("sentry.testutils")
 
 
 class Browser:
-    def __init__(self, driver, live_server):
+    def __init__(self, driver):
         self.driver = driver
-        self.live_server_url = live_server.url
-        self.domain = urlparse(self.live_server_url).hostname
         self._has_initialized_cookie_store = False
 
     def __getattr__(self, attr):
         return getattr(self.driver, attr)
 
-    def route(self, path, *args, **kwargs):
+    def route(self, server_url, path, *args, **kwargs):
         """
         Return the absolute URI for a given route in Sentry.
         """
-        return "{}/{}".format(self.live_server_url, path.lstrip("/").format(*args, **kwargs))
+        return "{}/{}".format(server_url, path.lstrip("/").format(*args, **kwargs))
 
-    def get(self, path, *args, **kwargs):
-        self.driver.get(self.route(path), *args, **kwargs)
+    def get(self, server_url, path="/", *args, **kwargs):
+        self.driver.get(self.route(server_url, path), *args, **kwargs)
         self._has_initialized_cookie_store = True
         return self
 
-    def post(self, path, *args, **kwargs):
-        self.driver.post(self.route(path), *args, **kwargs)
+    def post(self, server_url, path="/", *args, **kwargs):
+        self.driver.post(self.route(server_url, path), *args, **kwargs)
         self._has_initialized_cookie_store = True
         return self
 
-    def put(self, path, *args, **kwargs):
-        self.driver.put(self.route(path), *args, **kwargs)
+    def put(self, server_url, path="/", *args, **kwargs):
+        self.driver.put(self.route(server_url, path), *args, **kwargs)
         self._has_initialized_cookie_store = True
         return self
 
-    def delete(self, path, *args, **kwargs):
-        self.driver.delete(self.route(path), *args, **kwargs)
+    def delete(self, server_url, path="/", *args, **kwargs):
+        self.driver.delete(self.route(server_url, path), *args, **kwargs)
         self._has_initialized_cookie_store = True
         return self
 
@@ -376,13 +374,13 @@ class Browser:
         self,
         name,
         value,
-        domain=None,
+        server_url,
         path="/",
         expires="Tue, 20 Jun 2025 19:07:44 GMT",
         max_age=None,
         secure=None,
     ):
-        domain = domain or self.domain
+        domain = urlparse(server_url).hostname
         # Recent changes to Chrome no longer allow us to explicitly set a cookie domain
         # to be localhost. If no domain is specified, the cookie will be created on
         # the host of the current url that the browser has visited.
@@ -402,7 +400,7 @@ class Browser:
         # XXX(dcramer): the cookie store must be initialized via a URL
         if not self._has_initialized_cookie_store:
             logger.info("selenium.initialize-cookies")
-            self.get("/")
+            self.get(server_url, "/")
 
         # TODO(dcramer): this should be escaped, but idgaf
         logger.info(f"selenium.set-cookie.{name}", extra={"value": value})
@@ -458,7 +456,7 @@ def start_chrome(**chrome_args):
 
 
 @pytest.fixture(scope="function")
-def browser(request, live_server):
+def browser(request):
     window_size = request.config.getoption("window_size")
     window_width, window_height = map(int, window_size.split("x", 1))
 
@@ -508,7 +506,7 @@ def browser(request, live_server):
     request.node._driver = driver
     request.addfinalizer(fin)
 
-    browser = Browser(driver, live_server)
+    browser = Browser(driver)
 
     browser.set_emulated_media([{"name": "prefers-reduced-motion", "value": "reduce"}])
 
@@ -611,3 +609,65 @@ def format_log(log):
     log = "\n".join(entries)
     log = log.encode("utf-8")
     return log
+
+
+@pytest.fixture(scope="session")
+def session_browser(request):
+    window_size = request.config.getoption("window_size")
+    window_width, window_height = map(int, window_size.split("x", 1))
+
+    driver_type = request.config.getoption("selenium_driver")
+    headless = not request.config.getoption("no_headless")
+    if driver_type == "chrome":
+        options = webdriver.ChromeOptions()
+        options.add_argument("no-sandbox")
+        options.add_argument("disable-gpu")
+        options.add_argument("disable-dev-shm-usage")
+        options.add_argument(f"window-size={window_size}")
+        if headless:
+            options.add_argument("headless")
+        chrome_path = request.config.getoption("chrome_path")
+        if chrome_path:
+            options.binary_location = chrome_path
+        chromedriver_path = request.config.getoption("chromedriver_path")
+        chrome_args = {"options": options}
+        if chromedriver_path:
+            chrome_args["executable_path"] = chromedriver_path
+
+        driver = start_chrome(**chrome_args)
+    elif driver_type == "firefox":
+        driver = webdriver.Firefox()
+    elif driver_type == "phantomjs":
+        phantomjs_path = request.config.getoption("phantomjs_path")
+        if not phantomjs_path:
+            phantomjs_path = os.path.join("node_modules", "phantomjs-prebuilt", "bin", "phantomjs")
+        driver = webdriver.PhantomJS(executable_path=phantomjs_path)
+    else:
+        raise pytest.UsageError("--driver must be specified")
+
+    driver.set_window_size(window_width, window_height)
+
+    def fin():
+        # dump console log to stdout, will be shown when test fails
+        for entry in driver.get_log("browser"):
+            sys.stderr.write("[browser console] ")
+            sys.stderr.write(repr(entry))
+            sys.stderr.write("\n")
+        # Teardown Selenium.
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
+    request.node._driver = driver
+    request.addfinalizer(fin)
+
+    browser = Browser(driver)
+
+    browser.set_emulated_media([{"name": "prefers-reduced-motion", "value": "reduce"}])
+
+    if hasattr(request, "cls"):
+        request.cls.browser = browser
+    request.node.browser = browser
+
+    yield browser
