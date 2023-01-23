@@ -392,21 +392,10 @@ const appConfig: Configuration = {
     new CopyPlugin({
       patterns: [
         {
-          from: path.join(staticPrefix, 'images/logo-sentry.svg'),
+          from: `${staticPrefix}/images/logo-sentry.svg`,
           to: 'entrypoints/logo-sentry.svg',
           toType: 'file',
         },
-        // Add robots.txt when deploying in preview mode so public previews do
-        // not get indexed by bots.
-        ...(IS_DEPLOY_PREVIEW
-          ? [
-              {
-                from: path.join(staticPrefix, 'robots-dev.txt'),
-                to: 'robots.txt',
-                toType: 'file' as const,
-              },
-            ]
-          : []),
       ],
     }),
   ],
