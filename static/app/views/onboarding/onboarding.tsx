@@ -74,7 +74,6 @@ function Onboarding(props: Props) {
       window.clearTimeout(cornerVariantTimeoutRed.current);
     };
   }, []);
-
   const onboardingSteps = getOrganizationOnboardingSteps();
   const stepObj = onboardingSteps.find(({id}) => stepId === id);
   const stepIndex = onboardingSteps.findIndex(({id}) => stepId === id);
@@ -172,7 +171,6 @@ function Onboarding(props: Props) {
       />
     );
   }
-
   return (
     <OnboardingWrapper data-test-id="targeted-onboarding">
       <SentryDocumentTitle title={stepObj.title} />
@@ -192,12 +190,7 @@ function Onboarding(props: Props) {
           />
         </UpsellWrapper>
       </Header>
-      <Container
-        hasFooter={containerHasFooter}
-        hasHeartbeatFooter={
-          !!organization?.features.includes('onboarding-heartbeat-footer')
-        }
-      >
+      <Container hasFooter={containerHasFooter}>
         <Back animate={stepIndex > 0 ? 'visible' : 'hidden'} onClick={handleGoBack} />
         <AnimatePresence exitBeforeEnter onExitComplete={updateAnimationState}>
           <OnboardingStep key={stepObj.id} data-test-id={`onboarding-step-${stepObj.id}`}>
@@ -210,9 +203,6 @@ function Onboarding(props: Props) {
                 orgId={organization.slug}
                 organization={props.organization}
                 search={props.location.search}
-                route={props.route}
-                router={props.router}
-                location={props.location}
                 {...{
                   genSkipOnboardingLink,
                 }}
@@ -226,14 +216,13 @@ function Onboarding(props: Props) {
   );
 }
 
-const Container = styled('div')<{hasFooter: boolean; hasHeartbeatFooter: boolean}>`
+const Container = styled('div')<{hasFooter: boolean}>`
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   position: relative;
   background: ${p => p.theme.background};
-  padding: ${p =>
-    p.hasHeartbeatFooter ? `120px ${space(3)} 0 ${space(3)}` : `120px ${space(3)}`};
+  padding: 120px ${space(3)};
   width: 100%;
   margin: 0 auto;
   padding-bottom: ${p => p.hasFooter && '72px'};

@@ -5,7 +5,6 @@ import BadgeDisplayName from 'sentry/components/idBadge/badgeDisplayName';
 import BaseBadge from 'sentry/components/idBadge/baseBadge';
 import Link, {LinkProps} from 'sentry/components/links/link';
 import {Organization} from 'sentry/types';
-import getPlatformName from 'sentry/utils/getPlatformName';
 import withOrganization from 'sentry/utils/withOrganization';
 
 type BaseBadgeProps = React.ComponentProps<typeof BaseBadge>;
@@ -19,7 +18,6 @@ export interface ProjectBadgeProps
    * If true, this component will not be a link to project details page
    */
   disableLink?: boolean;
-  displayPlatformName?: boolean;
   /**
    * If true, will use default max-width, or specify one as a string
    */
@@ -37,7 +35,6 @@ const ProjectBadge = ({
   to,
   hideOverflow = true,
   disableLink = false,
-  displayPlatformName = false,
   className,
   ...props
 }: ProjectBadgeProps) => {
@@ -46,11 +43,7 @@ const ProjectBadge = ({
   const badge = (
     <BaseBadge
       displayName={
-        <BadgeDisplayName hideOverflow={hideOverflow}>
-          {displayPlatformName && project.platform
-            ? getPlatformName(project.platform)
-            : slug}
-        </BadgeDisplayName>
+        <BadgeDisplayName hideOverflow={hideOverflow}>{slug}</BadgeDisplayName>
       }
       project={project}
       {...props}

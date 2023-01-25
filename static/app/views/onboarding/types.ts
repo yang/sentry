@@ -1,5 +1,3 @@
-import {RouteComponentProps} from 'react-router';
-
 import {PlatformKey} from 'sentry/data/platformCategories';
 import {Organization} from 'sentry/types';
 
@@ -8,10 +6,7 @@ export type StepData = {
 };
 
 // Not sure if we need platform info to be passed down
-export type StepProps = Pick<
-  RouteComponentProps<{}, {}>,
-  'router' | 'route' | 'location'
-> & {
+export type StepProps = {
   active: boolean;
   genSkipOnboardingLink: () => React.ReactNode;
   onComplete: () => void;
