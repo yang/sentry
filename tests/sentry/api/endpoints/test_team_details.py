@@ -112,6 +112,18 @@ class TeamUpdateTest(TeamDetailsTestBase):
             == f"edited team {team.slug}'s org role to owner"
         )
 
+    @with_feature("organizations:org-roles-for-teams")
+    def test_put_team_org_role__manager(self):
+        team = self.team
+        user = self.create_user("foo@example.com")
+        self.create_member(user=user, organization=self.organization, role="manager")
+        self.login_as(user)
+
+        self.get_success_response(team.organization.slug, team.slug, orgRole="owner")
+
+        team = Team.objects.get(id=team.id)
+        assert team.org_role == "owner"
+
     def test_put_team_org_role__missing_flag(self):
         # the put goes through but doesn't update the org role field
         team = self.team
@@ -153,21 +165,6 @@ class TeamUpdateTest(TeamDetailsTestBase):
             team.organization.slug, team.slug, orgRole="owner", status_code=403
         )
         assert response.data["detail"] == "You do not have permission to perform this action."
-
-        team = Team.objects.get(id=team.id)
-        assert not team.org_role
-
-    @with_feature("organizations:org-roles-for-teams")
-    def test_put_team_org_role__manager(self):
-        team = self.team
-        user = self.create_user("foo@example.com")
-        self.create_member(user=user, organization=self.organization, role="manager")
-        self.login_as(user)
-
-        response = self.get_error_response(
-            team.organization.slug, team.slug, orgRole="owner", status_code=403
-        )
-        assert response.data["detail"] == "You must have the role of owner to perform this action."
 
         team = Team.objects.get(id=team.id)
         assert not team.org_role

@@ -102,13 +102,10 @@ class TeamDetailsEndpoint(TeamEndpoint):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-            # users should not be able to set the role of a team to something higher than themselves
-            # only allow the top dog to do this so they can set the org_role to any role in the org
-            elif not request.access.has_scope("org:admin"):
+            # requires member:write to modify the roles of the team members
+            elif not request.access.has_scope("member:write"):
                 return Response(
-                    {
-                        "detail": f"You must have the role of {roles.get_top_dog().id} to perform this action."
-                    },
+                    {"detail": "You must have the scope 'member:write' to perform this action."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
