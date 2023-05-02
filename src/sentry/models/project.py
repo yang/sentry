@@ -32,6 +32,7 @@ from sentry.db.models.utils import slugify_instance
 from sentry.db.postgres.roles import in_test_psql_role_override
 from sentry.locks import locks
 from sentry.models.outbox import OutboxCategory, OutboxScope, RegionOutbox
+from sentry.signals import spend_allocation_delete
 from sentry.snuba.models import SnubaQuery
 from sentry.utils import metrics
 from sentry.utils.colors import get_hashed_color
@@ -507,6 +508,9 @@ class Project(Model, PendingDeletionMixin, SnowflakeIdMixin):
 
         # There is no foreign key relationship so we have to manually cascade.
         NotificationSetting.objects.remove_for_project(self)
+
+        spend_allocation_delete.send(sender=Project, instance=self)
+
         with transaction.atomic(), in_test_psql_role_override("postgres"):
             Project.outbox_for_update(self.id, self.organization_id).save()
             return super().delete(**kwargs)

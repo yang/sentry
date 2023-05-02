@@ -37,6 +37,7 @@ from sentry.models.outbox import OutboxCategory, OutboxScope, RegionOutbox
 from sentry.models.team import Team
 from sentry.roles.manager import Role
 from sentry.services.hybrid_cloud.user import RpcUser, user_service
+from sentry.signals import spend_allocation_delete
 from sentry.utils.http import is_using_customer_domain
 from sentry.utils.retries import TimedRetryPolicy
 from sentry.utils.snowflake import SnowflakeIdMixin, generate_snowflake_id
@@ -270,6 +271,8 @@ class Organization(Model, SnowflakeIdMixin):
 
         # There is no foreign key relationship so we have to manually cascade.
         NotificationSetting.objects.remove_for_organization(self)
+
+        spend_allocation_delete.send(sender=Organization, instance=self)
 
         with transaction.atomic(), in_test_psql_role_override("postgres"):
             Organization.outbox_for_update(self.id).save()
