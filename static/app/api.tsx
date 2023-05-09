@@ -526,7 +526,8 @@ export class Client {
         completeHandler(responseMeta, statusText);
       })
       .catch(() => {
-        // Ignore all failed requests
+        // Ignore all failed requests (4xx and 5xx responses don't count as
+        // failed, and are handled in the `.then()` by `errorHandler`.)
       });
 
     const request = new Request(fetchRequest, aborter);
