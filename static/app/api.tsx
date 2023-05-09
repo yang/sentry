@@ -560,6 +560,7 @@ export class Client {
         },
         error: (resp: ResponseMeta) => {
           const errorObjectToUse = createRequestError(resp, options.method, path);
+          preservedError.addResponseMetadata(resp);
 
           // This *should* get logged to Sentry only if the promise rejection is
           // not handled (since SDK captures unhandled rejections). Ideally,
