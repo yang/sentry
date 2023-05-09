@@ -14,10 +14,7 @@ export default function createRequestError(
   path: string
 ) {
   const err = new RequestError(method, path);
-
-  if (resp) {
-    err.addResponseMetadata(resp);
-  }
+  err.addResponseMetadata(resp);
 
   return err;
 }
