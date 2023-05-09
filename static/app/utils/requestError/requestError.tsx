@@ -34,6 +34,8 @@ export default class RequestError extends Error {
    */
   addResponseMetadata(resp: ResponseMeta) {
     if (resp) {
+      this.setNameFromStatus(resp.status);
+
       this.message = `${this.message} ${
         typeof resp.status === 'number' ? resp.status : 'n/a'
       }`;
