@@ -13,7 +13,6 @@ import {
 import {metric} from 'sentry/utils/analytics';
 import getCsrfToken from 'sentry/utils/getCsrfToken';
 import {uniqueId} from 'sentry/utils/guid';
-import createRequestError from 'sentry/utils/requestError/createRequestError';
 import RequestError from 'sentry/utils/requestError/requestError';
 
 export class Request {
@@ -559,14 +558,13 @@ export class Client {
           }
         },
         error: (resp: ResponseMeta) => {
-          const errorObjectToUse = createRequestError(resp, options.method, path);
           preservedError.addResponseMetadata(resp);
 
           // This *should* get logged to Sentry only if the promise rejection is
           // not handled (since SDK captures unhandled rejections). Ideally,
           // wherever `requestPromnise` is used, we explicitly ignore the rejection
           // or handle it with a user-friendly error message.
-          reject(errorObjectToUse);
+          reject(preservedError);
         },
       })
     );
