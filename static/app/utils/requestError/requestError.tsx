@@ -2,17 +2,14 @@ import {ResponseMeta} from 'sentry/api';
 
 import {sanitizePath} from './sanitizePath';
 
-interface ErrorOptionsObject {
-  cause: Error;
-}
 export default class RequestError extends Error {
   responseText?: string;
   responseJSON?: any;
   status?: number;
   statusText?: string;
 
-  constructor(method: string | undefined, path: string, options: ErrorOptionsObject) {
-    super(`${method || 'GET'} "${sanitizePath(path)}"`, options);
+  constructor(method: string | undefined, path: string) {
+    super(`${method || 'GET'} ${sanitizePath(path)}`);
     this.name = 'RequestError';
     Object.setPrototypeOf(this, new.target.prototype);
   }

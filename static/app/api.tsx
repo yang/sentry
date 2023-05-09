@@ -562,12 +562,7 @@ export class Client {
           }
         },
         error: (resp: ResponseMeta) => {
-          const errorObjectToUse = createRequestError(
-            resp,
-            preservedError,
-            options.method,
-            path
-          );
+          const errorObjectToUse = createRequestError(resp, options.method, path);
 
           // Although `this.request` logs all error responses, this error object can
           // potentially be logged by Sentry's unhandled rejection handler
