@@ -22,9 +22,9 @@ export default class RequestError extends Error {
    */
   setResponse(resp: ResponseMeta) {
     if (resp) {
-      this.setMessage(
-        `${this.message} ${typeof resp.status === 'number' ? resp.status : 'n/a'}`
-      );
+      this.message = `${this.message} ${
+        typeof resp.status === 'number' ? resp.status : 'n/a'
+      }`;
 
       // Some callback handlers expect these properties on the error object
       if (resp.responseText) {
@@ -38,13 +38,5 @@ export default class RequestError extends Error {
       this.status = resp.status;
       this.statusText = resp.statusText;
     }
-  }
-
-  setMessage(message: string) {
-    this.message = message;
-  }
-
-  setName(name: string) {
-    this.name = name;
   }
 }
