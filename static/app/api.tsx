@@ -14,6 +14,7 @@ import {metric} from 'sentry/utils/analytics';
 import getCsrfToken from 'sentry/utils/getCsrfToken';
 import {uniqueId} from 'sentry/utils/guid';
 import createRequestError from 'sentry/utils/requestError/createRequestError';
+import RequestError from 'sentry/utils/requestError/requestError';
 
 export class Request {
   /**
@@ -544,7 +545,7 @@ export class Client {
   ): Promise<IncludeAllArgsType extends true ? ApiResult : any> {
     // Create an error object here before we make any async calls so that we
     // have a helpful stack trace if it errors
-    const preservedError = new Error('API Request Error');
+    const preservedError = new RequestError(options.method, path);
 
     return new Promise((resolve, reject) =>
       this.request(path, {
