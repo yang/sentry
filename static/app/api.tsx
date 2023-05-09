@@ -544,10 +544,6 @@ export class Client {
   ): Promise<IncludeAllArgsType extends true ? ApiResult : any> {
     // Create an error object here before we make any async calls so that we
     // have a helpful stack trace if it errors
-    //
-    // This *should* get logged to Sentry only if the promise rejection is not handled
-    // (since SDK captures unhandled rejections). Ideally we explicitly ignore rejection
-    // or handle with a user friendly error message
     const preservedError = new Error('API Request Error');
 
     return new Promise((resolve, reject) =>
@@ -564,8 +560,10 @@ export class Client {
         error: (resp: ResponseMeta) => {
           const errorObjectToUse = createRequestError(resp, options.method, path);
 
-          // Although `this.request` logs all error responses, this error object can
-          // potentially be logged by Sentry's unhandled rejection handler
+          // This *should* get logged to Sentry only if the promise rejection is
+          // not handled (since SDK captures unhandled rejections). Ideally,
+          // wherever `requestPromnise` is used, we explicitly ignore the rejection
+          // or handle it with a user-friendly error message.
           reject(errorObjectToUse);
         },
       })
