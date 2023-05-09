@@ -2,6 +2,21 @@ import {ResponseMeta} from 'sentry/api';
 
 import {sanitizePath} from './sanitizePath';
 
+const ERROR_MAP = {
+  0: 'CancelledError',
+  400: 'BadRequestError',
+  401: 'UnauthorizedError',
+  403: 'ForbiddenError',
+  404: 'NotFoundError',
+  426: 'UpgradeRequiredError',
+  429: 'TooManyRequestsError',
+  500: 'InternalServerError',
+  501: 'NotImplementedError',
+  502: 'BadGatewayError',
+  503: 'ServiceUnavailableError',
+  504: 'GatewayTimeoutError',
+};
+
 export default class RequestError extends Error {
   responseText?: string;
   responseJSON?: any;
@@ -34,6 +49,14 @@ export default class RequestError extends Error {
 
       this.status = resp.status;
       this.statusText = resp.statusText;
+    }
+  }
+
+  setNameFromStatus(status: number) {
+    const errorName = ERROR_MAP[status];
+
+    if (errorName) {
+      this.name = errorName;
     }
   }
 }
