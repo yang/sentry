@@ -90,7 +90,11 @@ class CococaSDKTestMixin(BaseSDKCrashDetectionMixin):
         self.execute_test(get_crash_event(handled=True), False, mock_sdk_crash_reporter)
 
     def test_wrong_function_not_detected(self, mock_sdk_crash_reporter):
-        self.execute_test(get_crash_event(function="Senry"), False, mock_sdk_crash_reporter)
+        self.execute_test(
+            get_crash_event(function="-[SentryClient captureMessage:withScope:]"),
+            True,
+            mock_sdk_crash_reporter,
+        )
 
     def test_wrong_platform_not_detected(self, mock_sdk_crash_reporter):
         self.execute_test(get_crash_event(platform="coco"), False, mock_sdk_crash_reporter)

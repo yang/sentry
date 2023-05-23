@@ -1,7 +1,10 @@
+import logging
 from typing import Any, Mapping, Sequence
 
 from sentry.utils.glob import glob_match
 from sentry.utils.sdk_crashes.sdk_crash_detector import SDKCrashDetector
+
+logger = logging.getLogger(__name__)
 
 
 class CocoaSDKCrashDetector(SDKCrashDetector):
@@ -10,9 +13,11 @@ class CocoaSDKCrashDetector(SDKCrashDetector):
 
     def is_sdk_crash(self, frames: Sequence[Mapping[str, Any]]) -> bool:
         if not frames:
+            logger.info("No frames found.")
             return False
 
-        for frame in frames:
+        frames_reversed = frames[::-1]
+        for frame in frames_reversed:
             if self.is_sdk_frame(frame):
                 return True
 

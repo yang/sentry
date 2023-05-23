@@ -1506,7 +1506,7 @@ SENTRY_FEATURES = {
     # If true certain Slack messages will be escaped to prevent rendering markdown
     "organizations:slack-escape-messages": False,
     # Enable detecting SDK crashes during event processing
-    "organizations:sdk-crash-reporting": False,
+    "organizations:sdk-crash-reporting": True,
     # Adds additional filters and a new section to issue alert rules.
     "projects:alert-filters": True,
     # Enable functionality to specify custom inbound filters on events.
@@ -2183,7 +2183,7 @@ SENTRY_WATCHERS = (
 # generate fake data for local testing. You can also manually enable relay with the `--ingest` flag to `devserver`.
 # XXX: This is disabled by default as typical development workflows do not require end-to-end services running
 # and disabling optional services reduces resource consumption and complexity
-SENTRY_USE_RELAY = False
+SENTRY_USE_RELAY = True
 SENTRY_RELAY_PORT = 7899
 
 # Controls whether we'll run the snuba subscription processor. If enabled, we'll run
@@ -3338,4 +3338,4 @@ MAX_ENVIRONMENTS_PER_MONITOR = 1000
 SENTRY_METRICS_INDEXER_RAISE_VALIDATION_ERRORS = False
 
 # The project ID for SDK Crash Monitoring to save the detected SDK crashed to.
-SDK_CRASH_DETECTION_PROJECT_ID = None
+SDK_CRASH_DETECTION_PROJECT_ID = 3

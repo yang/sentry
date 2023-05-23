@@ -545,6 +545,11 @@ def post_process_group(
 def run_post_process_job(job: PostProcessJob):
     group_event = job["event"]
     issue_category = group_event.group.issue_category
+    logger.info(
+        "Detecting SDK crash for event with message: %s and platform %s",
+        group_event.message,
+        group_event.platform,
+    )
 
     if not group_event.group.issue_type.allow_post_process_group(group_event.group.organization):
         return
@@ -974,6 +979,7 @@ def sdk_crash_monitoring(job: PostProcessJob):
     from sentry.utils.sdk_crashes.sdk_crash_detection import sdk_crash_detection
 
     if job["is_reprocessed"]:
+        logger.info("Skipping sdk_crash_monitoring for reprocessed event")
         return
 
     event = job["event"]

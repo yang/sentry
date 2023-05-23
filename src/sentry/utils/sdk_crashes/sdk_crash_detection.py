@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
 
 from django.conf import settings
@@ -12,6 +13,8 @@ from sentry.utils.sdk_crashes.cocoa_sdk_crash_detector import CocoaSDKCrashDetec
 from sentry.utils.sdk_crashes.event_stripper import EventStripper
 from sentry.utils.sdk_crashes.sdk_crash_detector import SDKCrashDetector
 
+logger = logging.getLogger(__name__)
+
 
 class SDKCrashReporter:
     def __init__(self):
@@ -19,6 +22,8 @@ class SDKCrashReporter:
 
     def report(self, event_data: Dict[str, Any], event_project_id: int) -> Event:
         from sentry.event_manager import EventManager
+
+        logger.info("Saving SDK Crash event.")
 
         manager = EventManager(event_data)
         return manager.save(project_id=event_project_id)
@@ -37,7 +42,14 @@ class SDKCrashDetection:
         self.event_stripper = event_stripper
 
     def detect_sdk_crash(self, event: Event) -> Event:
+        logger.info(
+            "Detecting SDK crash for event with message: %s and platform %s",
+            event.message,
+            event.platform,
+        )
+
         if not features.has("organizations:sdk-crash-reporting", event.project.organization):
+            logger.info("Feature disabled: sdk-crash-reporting")
             return None
 
         should_detect_sdk_crash = (
@@ -46,20 +58,30 @@ class SDKCrashDetection:
             and event.group.platform == "cocoa"
         )
         if should_detect_sdk_crash is False:
+            logger.info("Ignoring event: not a Cocoa Crash")
             return
 
         context = get_path(event.data, "contexts", "sdk_crash_detection")
         if context is not None and context.get("detected", False):
             return None
 
-        is_unhandled = (
-            get_path(event.data, "exception", "values", -1, "mechanism", "data", "handled") is False
-        )
-        if is_unhandled is False:
+        handled = get_path(event.data, "exception", "values", -1, "mechanism", "handled")
+
+        if handled is True:
+            logger.info(
+                "Ignoring event: cause handled is %s and mechanism is %s",
+                handled,
+                get_path(event.data, "exception", "values", -1, "mechanism"),
+            )
             return None
 
         frames = get_path(event.data, "exception", "values", -1, "stacktrace", "frames")
         if not frames:
+            logger.info(
+                "Ignoring event: no frames as frames are %s and stacktrace is %s",
+                frames,
+                get_path(event.data, "exception", "values", -1, "stacktrace"),
+            )
             return None
 
         if self.cocoa_sdk_crash_detector.is_sdk_crash(frames):
@@ -75,6 +97,8 @@ class SDKCrashDetection:
             return self.sdk_crash_reporter.report(
                 sdk_crash_event_data, settings.SDK_CRASH_DETECTION_PROJECT_ID
             )
+        else:
+            logger.info("Not a SDK crash.")
 
 
 _crash_reporter = SDKCrashReporter()

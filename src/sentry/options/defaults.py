@@ -174,7 +174,7 @@ register("filestore.backend", default="filesystem", flags=FLAG_NOSTORE)
 register("filestore.options", default={"location": "/tmp/sentry-files"}, flags=FLAG_NOSTORE)
 
 # Symbol server
-register("symbolserver.enabled", default=False, flags=FLAG_ALLOW_EMPTY | FLAG_PRIORITIZE_DISK)
+register("symbolserver.enabled", default=True, flags=FLAG_ALLOW_EMPTY | FLAG_PRIORITIZE_DISK)
 register(
     "symbolserver.options",
     default={"url": "http://127.0.0.1:3000"},
@@ -182,7 +182,7 @@ register(
 )
 
 # Symbolicator
-register("symbolicator.enabled", default=False, flags=FLAG_ALLOW_EMPTY | FLAG_PRIORITIZE_DISK)
+register("symbolicator.enabled", default=True, flags=FLAG_ALLOW_EMPTY | FLAG_PRIORITIZE_DISK)
 register(
     "symbolicator.options",
     default={"url": "http://localhost:3021"},
