@@ -85,7 +85,13 @@ class OAuthTokenView(View):
         elif grant.redirect_uri != redirect_uri:
             return self.error(request, "invalid_grant", "invalid redirect_uri")
 
-        return ApiToken.from_grant(grant)
+        token = ApiToken.from_grant(grant)
+
+        if grant.has_scope("openid"):
+            id_token = self._get_open_id_token(request)
+            return token, id_token
+
+        return token, None
 
     def _get_refresh_token(self, request):
         refresh_token = request.POST.get("refresh_token")
@@ -117,6 +123,9 @@ class OAuthTokenView(View):
         token.refresh()
 
         return token
+
+    def _get_open_id_token(self, request):
+        pass
 
     def _process_token_details(self, token):
         return HttpResponse(
