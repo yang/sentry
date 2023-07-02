@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import View
 
 from sentry.mediators import GrantTypes
-from sentry.models import ApiApplication, ApiApplicationStatus, ApiGrant, ApiToken
+from sentry.models import ApiApplication, ApiApplicationStatus, ApiGrant, ApiToken, OpenIDToken
 from sentry.utils import json
 
 logger = logging.getLogger("sentry.api")
@@ -124,19 +124,12 @@ class OAuthTokenView(View):
         return token
 
     def _get_open_id_token(self, request):
-        jwt_header = {"typ": "JWT", "alg": "HS256", "kid": None}
-
-        jwt_payload = {
-            "iss": "https://sentry.io",
-            "sub": "temp",
-            "aud": request.POST.get("client_id"),
-        }
-        if request.POST.get("nonce"):
-            jwt_payload["nonce"] = request.POST.get("nonce")
-
-        # Sign the request
-        id_token = (jwt_header, jwt_payload)
-        return id_token
+        open_id_token = OpenIDToken.objects.create(
+            user="temp",  # Find out how to get the user in here
+            aud=request.POST.get("client_id"),
+            nonce=request.POST.get("nonce"),
+        )
+        return open_id_token.get_encrypted_id_token()
 
     def _process_token_details(self, token, id_token=None):
         token_information = {
