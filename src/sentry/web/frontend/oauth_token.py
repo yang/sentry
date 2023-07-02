@@ -44,32 +44,20 @@ class OAuthTokenView(View):
     @never_cache
     def post(self, request: Request) -> HttpResponse:
         grant_type = request.POST.get("grant_type")
-
-        id_token = None
+        client_id = request.POST.get("client_id")
+        if not client_id:
+            return self.error(request, "invalid_client", "missing client_id")
         if grant_type == GrantTypes.AUTHORIZATION:
-            grant = self._get_grant(request)
-            if type(grant) != ApiGrant:
-                return grant
-            access_token_or_error = ApiToken.from_grant(grant)
-            if grant.has_scope("openid"):
-                id_token = self._get_id_token
-        elif grant_type == "refresh_token":
-            access_token_or_error = self._get_refresh_token(request)
+            return self._get_access_tokens(request, client_id)
+        elif grant_type == GrantTypes.REFRESH:
+            return self._get_refresh_token(request, client_id)
         else:
             return self.error(request, "unsupported_grant_type")
 
-        if type(access_token_or_error) != ApiToken:
-            return access_token_or_error
-
-        return self._process_token_details(access_token_or_error, id_token)
-
-    def _get_grant(self, request):
-        client_id = request.POST.get("client_id")
+    def _get_access_tokens(self, request, client_id):
         redirect_uri = request.POST.get("redirect_uri")
         code = request.POST.get("code")
 
-        if not client_id:
-            return self.error(request, "invalid_client", "missing client_id")
         try:
             application = ApiApplication.objects.get(
                 client_id=client_id, status=ApiApplicationStatus.active
@@ -90,12 +78,23 @@ class OAuthTokenView(View):
         elif grant.redirect_uri != redirect_uri:
             return self.error(request, "invalid_grant", "invalid redirect_uri")
 
-        return grant
+        access_token = ApiToken.from_grant(grant)
+        id_token = self._get_open_id_token(grant, request)
+        return self._process_token_details(access_token, id_token)
 
-    def _get_refresh_token(self, request):
+    def _get_open_id_token(self, grant, request):
+        if grant.has_scope("openid"):
+            open_id_token = OpenIDToken.objects.create(
+                user=grant.user,
+                aud=request.POST.get("client_id"),
+                nonce=request.POST.get("nonce"),
+            )
+            return open_id_token.get_encrypted_id_token()
+        return None
+
+    def _get_refresh_token(self, request, client_id):
         refresh_token = request.POST.get("refresh_token")
         scope = request.POST.get("scope")
-        client_id = request.POST.get("client_id")
 
         if not refresh_token:
             return self.error(request, "invalid_request")
@@ -103,9 +102,6 @@ class OAuthTokenView(View):
         # TODO(dcramer): support scope
         if scope:
             return self.error(request, "invalid_request")
-
-        if not client_id:
-            return self.error(request, "invalid_client", "missing client_id")
 
         try:
             application = ApiApplication.objects.get(
@@ -121,15 +117,7 @@ class OAuthTokenView(View):
 
         token.refresh()
 
-        return token
-
-    def _get_open_id_token(self, request):
-        open_id_token = OpenIDToken.objects.create(
-            user="temp",  # Find out how to get the user in here
-            aud=request.POST.get("client_id"),
-            nonce=request.POST.get("nonce"),
-        )
-        return open_id_token.get_encrypted_id_token()
+        return self._process_token_details(token)
 
     def _process_token_details(self, token, id_token=None):
         token_information = {
