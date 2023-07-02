@@ -45,26 +45,31 @@ class OAuthTokenView(View):
     def post(self, request: Request) -> HttpResponse:
         grant_type = request.POST.get("grant_type")
 
+        id_token = None
         if grant_type == GrantTypes.AUTHORIZATION:
-            token_or_error_details = self._get_access_token(request)
+            grant = self._get_grant(request)
+            if type(grant) != ApiGrant:
+                return grant
+            access_token_or_error = ApiToken.from_grant(grant)
+            if grant.has_scope("openid"):
+                id_token = self._get_id_token
         elif grant_type == "refresh_token":
-            token_or_error_details = self._get_refresh_token(request)
+            access_token_or_error = self._get_refresh_token(request)
         else:
             return self.error(request, "unsupported_grant_type")
 
-        if type(token_or_error_details) != ApiToken:
-            return token_or_error_details
+        if type(access_token_or_error) != ApiToken:
+            return access_token_or_error
 
-        return self._process_token_details(token_or_error_details)
+        return self._process_token_details(access_token_or_error, id_token)
 
-    def _get_access_token(self, request):
+    def _get_grant(self, request):
         client_id = request.POST.get("client_id")
         redirect_uri = request.POST.get("redirect_uri")
         code = request.POST.get("code")
 
         if not client_id:
             return self.error(request, "invalid_client", "missing client_id")
-
         try:
             application = ApiApplication.objects.get(
                 client_id=client_id, status=ApiApplicationStatus.active
@@ -85,13 +90,7 @@ class OAuthTokenView(View):
         elif grant.redirect_uri != redirect_uri:
             return self.error(request, "invalid_grant", "invalid redirect_uri")
 
-        token = ApiToken.from_grant(grant)
-
-        if grant.has_scope("openid"):
-            id_token = self._get_open_id_token(request)
-            return token, id_token
-
-        return token, None
+        return grant
 
     def _get_refresh_token(self, request):
         refresh_token = request.POST.get("refresh_token")
@@ -125,27 +124,40 @@ class OAuthTokenView(View):
         return token
 
     def _get_open_id_token(self, request):
-        pass
+        jwt_header = {"typ": "JWT", "alg": "HS256", "kid": None}
 
-    def _process_token_details(self, token):
+        jwt_payload = {
+            "iss": "https://sentry.io",
+            "sub": "temp",
+            "aud": request.POST.get("client_id"),
+        }
+        if request.POST.get("nonce"):
+            jwt_payload["nonce"] = request.POST.get("nonce")
+
+        # Sign the request
+        id_token = (jwt_header, jwt_payload)
+        return id_token
+
+    def _process_token_details(self, token, id_token=None):
+        token_information = {
+            "access_token": token.token,
+            "refresh_token": token.refresh_token,
+            "expires_in": int((token.expires_at - timezone.now()).total_seconds())
+            if token.expires_at
+            else None,
+            "expires_at": token.expires_at,
+            "token_type": "bearer",
+            "scope": " ".join(token.get_scopes()),
+            "user": {
+                "id": str(token.user.id),
+                # we might need these to become scope based
+                "name": token.user.name,
+                "email": token.user.email,
+            },
+        }
+        if id_token:
+            token_information["id_token"] = id_token
         return HttpResponse(
-            json.dumps(
-                {
-                    "access_token": token.token,
-                    "refresh_token": token.refresh_token,
-                    "expires_in": int((token.expires_at - timezone.now()).total_seconds())
-                    if token.expires_at
-                    else None,
-                    "expires_at": token.expires_at,
-                    "token_type": "bearer",
-                    "scope": " ".join(token.get_scopes()),
-                    "user": {
-                        "id": str(token.user.id),
-                        # we might need these to become scope based
-                        "name": token.user.name,
-                        "email": token.user.email,
-                    },
-                }
-            ),
+            json.dumps(token_information),
             content_type="application/json",
         )
