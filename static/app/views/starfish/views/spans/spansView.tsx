@@ -17,6 +17,7 @@ import {SpanOperationSelector} from 'sentry/views/starfish/views/spans/selectors
 import {SpanTimeCharts} from 'sentry/views/starfish/views/spans/spanTimeCharts';
 
 import SpansTable, {isAValidSort} from './spansTable';
+import {SystemSelector} from 'sentry/views/starfish/views/spans/selectors/systemSelector';
 
 const DEFAULT_SORT: Sort = {
   kind: 'desc',
