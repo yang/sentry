@@ -14,10 +14,10 @@ import {QueryParameterNames} from 'sentry/views/starfish/views/queryParameters';
 import {ActionSelector} from 'sentry/views/starfish/views/spans/selectors/actionSelector';
 import {DomainSelector} from 'sentry/views/starfish/views/spans/selectors/domainSelector';
 import {SpanOperationSelector} from 'sentry/views/starfish/views/spans/selectors/spanOperationSelector';
+import {SystemSelector} from 'sentry/views/starfish/views/spans/selectors/systemSelector';
 import {SpanTimeCharts} from 'sentry/views/starfish/views/spans/spanTimeCharts';
 
 import SpansTable, {isAValidSort} from './spansTable';
-import {SystemSelector} from 'sentry/views/starfish/views/spans/selectors/systemSelector';
 
 const DEFAULT_SORT: Sort = {
   kind: 'desc',
@@ -53,10 +53,13 @@ export default function SpansView(props: Props) {
 
   return (
     <Fragment>
-      <StyledPageFilterBar condensed>
-        <StarfishProjectSelector />
-        <StarfishDatePicker />
-      </StyledPageFilterBar>
+      <PageFilterWrapper>
+        <StyledPageFilterBar condensed>
+          <StarfishProjectSelector />
+          <StarfishDatePicker />
+        </StyledPageFilterBar>
+        {props.moduleName === ModuleName.DB && <SystemSelector />}
+      </PageFilterWrapper>
 
       <PaddedContainer>
         <SpanTimeCharts
@@ -111,4 +114,8 @@ const FilterOptionsContainer = styled(PaddedContainer)`
 const StyledPageFilterBar = styled(PageFilterBar)`
   margin: 0 ${space(2)};
   margin-bottom: ${space(2)};
+`;
+
+const PageFilterWrapper = styled('div')`
+  display: flex;
 `;
