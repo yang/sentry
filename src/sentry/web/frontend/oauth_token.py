@@ -55,7 +55,7 @@ class OAuthTokenView(View):
     def _get_access_tokens(self, request, client_id):
         redirect_uri = request.POST.get("redirect_uri")
         code = request.POST.get("code")
-
+        print("----------------------------------------------------")
         try:
             application = ApiApplication.objects.get(
                 client_id=client_id, status=ApiApplicationStatus.active
@@ -66,14 +66,18 @@ class OAuthTokenView(View):
         try:
             grant = ApiGrant.objects.get(application=application, code=code)
         except ApiGrant.DoesNotExist:
+            print("GRANT DOES NOT EXIST")
             return self.error(request, "invalid_grant", "invalid grant")
 
         if grant.is_expired():
+            print("GRANT IS EXPIRED")
             return self.error(request, "invalid_grant", "grant expired")
 
         if not redirect_uri:
             redirect_uri = application.get_default_redirect_uri()
         elif grant.redirect_uri != redirect_uri:
+            print("BAD REDIRECT URI")
+
             return self.error(request, "invalid_grant", "invalid redirect_uri")
 
         access_token = ApiToken.from_grant(grant)

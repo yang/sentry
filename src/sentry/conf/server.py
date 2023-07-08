@@ -2127,11 +2127,11 @@ SENTRY_SCOPE_SETS = (
         ("alerts:write", "Read and write alerts"),
         ("alerts:read", "Read alerts"),
     ),
-    (("openid", "Confirms a user authenticated and provides basic information."),),
+    (("openid", "Confirms you authenticated and provides your basic information."),),
     (
         (
             "profile",
-            "Read users personal information like name, , avatar, date of joining etc. Requires openid scope.",
+            "Read users personal information like name, avatar, date of joining etc. Requires openid scope.",
         ),
     ),
     (("email", "Read users email address. Requires openid scope."),),

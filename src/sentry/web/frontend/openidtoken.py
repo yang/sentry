@@ -33,7 +33,7 @@ class OpenIDToken:
         self.exp = exp if exp else default_expiration()
         self.iat = iat if iat else timezone.now()
 
-    def get_encrypted_id_token(self, signing_key):
+    def get_encrypted_id_token(self):
         headers = {
             "alg": "HS256",
             "typ": "JWT",
@@ -47,4 +47,6 @@ class OpenIDToken:
         }
         if self.nonce:
             claims["nonce"] = self.nonce
-        return jwt_utils.encode(claims, signing_key, headers={**headers, "alg": "RS256"})
+        return jwt_utils.encode(
+            payload=claims, key="secret", algorithm="HS256", headers={**headers}
+        )
