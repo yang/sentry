@@ -271,10 +271,6 @@ const buildDiscoverQueryConditions = (
     result.push(`span.module:${moduleName}`);
   }
 
-  if (moduleName === ModuleName.DB) {
-    result.push('!span.op:db.redis');
-  }
-
   if (spanCategory) {
     if (spanCategory === NULL_SPAN_CATEGORY) {
       result.push(`!has:span.category`);
