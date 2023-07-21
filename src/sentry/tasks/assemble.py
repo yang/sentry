@@ -442,6 +442,8 @@ class ArtifactBundlePostAssembler(PostAssembler):
         release: Optional[str],
         dist: Optional[str],
         project_ids: Optional[List[int]],
+        # XXX: why is this optional? Neither the UI, nor processing will ever use a bundle without
+        # an associated project, so that would just create "dead"/unreachable bundles
     ):
         super().__init__(assemble_result)
         self.organization = organization
@@ -542,6 +544,7 @@ class ArtifactBundlePostAssembler(PostAssembler):
 
         try:
             organization = Organization.objects.get_from_cache(id=self.organization.id)
+            # XXX: is `self.organization` just a partial object, or why do we need to fetch it once more?
         except Organization.DoesNotExist:
             organization = None
 
@@ -563,9 +566,14 @@ class ArtifactBundlePostAssembler(PostAssembler):
             )
 
     def _bind_or_create_artifact_bundle(
-        self, bundle_id: Optional[str], date_added: datetime
+        # XXX: what does `bind` mean here? What are we binding?
+        self,
+        bundle_id: Optional[str],
+        date_added: datetime,
     ) -> Tuple[ArtifactBundle, bool]:
         existing_artifact_bundles = list(
+            # XXX: `bundle_id` is marked as `Optional`, though the DB has a NOT NULL field.
+            # Will this query actually fail on `None`?
             ArtifactBundle.objects.filter(organization_id=self.organization.id, bundle_id=bundle_id)
         )
 
@@ -583,6 +591,8 @@ class ArtifactBundlePostAssembler(PostAssembler):
             artifact_bundle = ArtifactBundle.objects.create(
                 organization_id=self.organization.id,
                 # In case we didn't find the bundle_id in the manifest, we will just generate our own.
+                # XXX: ^ TBH, that should be done *outside* of this function, and ideally in a deterministic way,
+                # which most likely means using the sha hash of the file.
                 bundle_id=bundle_id or uuid.uuid4().hex,
                 file=self.assemble_result.bundle,
                 artifact_count=self.archive.artifact_count,
@@ -605,6 +615,8 @@ class ArtifactBundlePostAssembler(PostAssembler):
             # Only if the file objects are different we want to update the database, otherwise we will end up deleting
             # a newly bound file.
             if existing_file != self.assemble_result.bundle:
+                # XXX: can this case even happen? This means we have the same `bundle_id`,
+                # but with different files. This means there was a uuid/hash collision somewhere?
                 # In case there is an ArtifactBundle with a specific bundle_id, we want to change its underlying File
                 # model with its corresponding artifact count and also update the dates.
                 existing_artifact_bundle.update(
