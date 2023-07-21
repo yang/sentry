@@ -31,6 +31,9 @@ filterwarnings = [
     # Consider all warnings to be errors other than the ignored ones.
     "error",
 
+    "once::django.utils.deprecation.RemovedInDjango50Warning",
+    "once::django.utils.deprecation.RemovedInDjango51Warning",
+
     # At writing, the Google Bigtable Emulator relies on deprecated behavior
     # internally, this can be removed once a version containing this fix is
     # released: https://github.com/googleapis/python-bigtable/pull/246
