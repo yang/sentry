@@ -13,6 +13,7 @@ asgiref==3.7.2
 async-timeout==4.0.2
 attrs==19.2.0
 avalara==20.9.0
+backports-zoneinfo==0.2.1
 beautifulsoup4==4.7.1
 billiard==3.6.4.0
 boto3==1.28.26
@@ -31,7 +32,7 @@ cssselect==1.0.3
 cssutils==2.4.0
 datadog==0.29.3
 decorator==5.1.1
-django==3.2.20
+django==4.2.4
 django-crispy-forms==1.14.0
 django-csp==3.7
 django-pg-zero-downtime-migrations==0.13
