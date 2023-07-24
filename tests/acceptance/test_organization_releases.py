@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 
 from django.utils import timezone
 
@@ -8,7 +8,7 @@ from sentry.testutils.silo import no_silo_test
 
 @no_silo_test(stable=True)
 class OrganizationReleasesTest(AcceptanceTestCase):
-    release_date = datetime(2020, 5, 18, 15, 13, 58, 132928, tzinfo=timezone.utc)
+    release_date = datetime.datetime(2020, 5, 18, 15, 13, 58, 132928, tzinfo=datetime.timezone.utc)
 
     def setUp(self):
         super().setUp()

@@ -12,11 +12,10 @@ In Sentry a user must achieve the following to be treated as a superuser:
 
 import ipaddress
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.core.signing import BadSignature
-from django.utils import timezone
 from django.utils.crypto import constant_time_compare, get_random_string
 from rest_framework import serializers, status
 
@@ -100,7 +99,7 @@ class Superuser:
     def _check_expired_on_org_change(self):
         if self.expires is not None:
             session_start_time = self.expires - MAX_AGE
-            current_datetime = timezone.now()
+            current_datetime = datetime.now(tz=timezone.utc)
             if current_datetime - session_start_time > MAX_AGE_PRIVILEGED_ORG_ACCESS:
                 logger.warning(
                     "superuser.privileged_org_access_expired",
@@ -222,7 +221,7 @@ class Superuser:
             return
 
         if current_datetime is None:
-            current_datetime = timezone.now()
+            current_datetime = datetime.now(tz=timezone.utc)
 
         try:
             data["idl"] = datetime.utcfromtimestamp(float(data["idl"])).replace(tzinfo=timezone.utc)
@@ -262,7 +261,7 @@ class Superuser:
 
     def _populate(self, current_datetime=None):
         if current_datetime is None:
-            current_datetime = timezone.now()
+            current_datetime = datetime.now(tz=timezone.utc)
 
         request = self.request
         user = getattr(request, "user", None)
@@ -302,7 +301,7 @@ class Superuser:
         # the superuser check happens right here)
         assert user.is_superuser
         if current_datetime is None:
-            current_datetime = timezone.now()
+            current_datetime = datetime.now(tz=timezone.utc)
         self.token = token
         self.uid = str(user.id)
         # the absolute maximum age of this session
@@ -334,7 +333,7 @@ class Superuser:
         """
         request = self.request
         if current_datetime is None:
-            current_datetime = timezone.now()
+            current_datetime = datetime.now(tz=timezone.utc)
 
         token = get_random_string(12)
 

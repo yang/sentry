@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from django.db import router, transaction
 from django.db.models.signals import post_save
-from django.utils import timezone
 from snuba_sdk import Column, Condition, Limit, Op
 
 from sentry import analytics, audit_log, features, quotas
@@ -172,7 +171,7 @@ def update_incident_status(
         prev_status = incident.status
         kwargs = {"status": status.value, "status_method": status_method.value}
         if status == IncidentStatus.CLOSED:
-            kwargs["date_closed"] = date_closed if date_closed else timezone.now()
+            kwargs["date_closed"] = date_closed if date_closed else datetime.now(tz=timezone.utc)
         elif status == IncidentStatus.OPEN:
             # If we're moving back out of closed status then unset the closed
             # date
@@ -220,7 +219,7 @@ def set_incident_seen(incident, user=None):
             incident_seen, created = IncidentSeen.objects.create_or_update(
                 incident=incident,
                 user_id=user.id if user else None,
-                values={"last_seen": timezone.now()},
+                values={"last_seen": datetime.now(tz=timezone.utc)},
             )
             return incident_seen
 
@@ -349,7 +348,7 @@ def calculate_incident_time_range(incident, start=None, end=None, windowed_stats
     start = incident.date_started - time_window_delta if start is None else start
     end = incident.current_end_date + time_window_delta if end is None else end
     if windowed_stats:
-        now = timezone.now()
+        now = datetime.now(tz=timezone.utc)
         end = start + timedelta(seconds=time_window * (WINDOWED_STATS_DATA_POINTS / 2))
         start = start - timedelta(seconds=time_window * (WINDOWED_STATS_DATA_POINTS / 2))
         if end > now:
@@ -657,7 +656,7 @@ def update_alert_rule(
     comparison period. In minutes.
     :return: The updated `AlertRule`
     """
-    updated_fields = {"date_modified": timezone.now()}
+    updated_fields = {"date_modified": datetime.now(tz=timezone.utc)}
     updated_query_fields = {}
     if name:
         updated_fields["name"] = name

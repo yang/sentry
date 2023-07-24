@@ -6,7 +6,7 @@ import logging
 import time
 import traceback
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from random import Random
 from typing import Any, MutableMapping
 from unittest import mock
@@ -16,7 +16,6 @@ import pytz
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
@@ -702,7 +701,7 @@ def recover_account(request):
             ),
             "domain": get_server_hostname(),
             "ip_address": request.META["REMOTE_ADDR"],
-            "datetime": timezone.now(),
+            "datetime": datetime.now(tz=timezone.utc),
         },
     ).render(request)
 
@@ -722,7 +721,7 @@ def org_delete_confirm(request):
         context={
             "organization": org,
             "audit_log_entry": entry,
-            "eta": timezone.now() + timedelta(days=1),
+            "eta": datetime.now(tz=timezone.utc) + timedelta(days=1),
             "url": org.absolute_url(reverse("sentry-restore-organization", args=[org.slug])),
         },
     ).render(request)

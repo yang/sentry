@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -35,7 +36,7 @@ from sentry.utils.auth import mark_sso_complete
 
 UNSET = object()
 
-BASETIME = datetime(2022, 3, 21, 0, 0, tzinfo=timezone.utc)
+BASETIME = datetime.datetime(2022, 3, 21, 0, 0, tzinfo=datetime.timezone.utc)
 
 EXPIRE_TIME = timedelta(hours=4, minutes=1)
 

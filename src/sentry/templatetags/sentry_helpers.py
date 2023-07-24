@@ -220,7 +220,7 @@ def timesince(value, now=None):
     from django.utils.timesince import timesince
 
     if now is None:
-        now = timezone.now()
+        now = datetime.now(tz=timezone.utc)
     if not value:
         return _("never")
     if value < (now - timedelta(days=5)):

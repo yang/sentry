@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from django.utils import timezone
+from datetime import datetime, timezone
 
 from sentry.models import (
     Deploy,
@@ -63,7 +61,7 @@ class DashboardTest(AcceptanceTestCase, SnubaTestCase):
             task=OnboardingTask.FIRST_EVENT,
             status=OnboardingTaskStatus.COMPLETE,
         )
-        self.project.update(first_event=timezone.now())
+        self.project.update(first_event=datetime.now(tz=timezone.utc))
 
     def test_project_with_no_first_event(self):
         self.project.update(first_event=None)

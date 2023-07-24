@@ -1,9 +1,8 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from celery.exceptions import MaxRetriesExceededError
-from django.utils import timezone
 from sentry_sdk import set_tag
 
 from sentry import analytics
@@ -168,7 +167,7 @@ def process_commit_context(
             }
             # Delete old owners
             to_be_deleted = owners.filter(
-                date_added__lte=timezone.now() - PREFERRED_GROUP_OWNER_AGE
+                date_added__lte=datetime.now(tz=timezone.utc) - PREFERRED_GROUP_OWNER_AGE
             )
 
             if len(to_be_deleted):
@@ -176,12 +175,12 @@ def process_commit_context(
                     record.delete()
 
             current_owners = owners.filter(
-                date_added__gte=timezone.now() - PREFERRED_GROUP_OWNER_AGE
+                date_added__gte=datetime.now(tz=timezone.utc) - PREFERRED_GROUP_OWNER_AGE
             ).order_by("-date_added")
 
             if len(current_owners) >= PREFERRED_GROUP_OWNERS:
                 # When there exists a Suspect Committer, we want to debounce this task until that Suspect Committer hits the TTL of PREFERRED_GROUP_OWNER_AGE
-                cache_duration = timezone.now() - current_owners[0].date_added
+                cache_duration = datetime.now(tz=timezone.utc) - current_owners[0].date_added
                 cache_duration = (
                     cache_duration
                     if cache_duration < PREFERRED_GROUP_OWNER_AGE
@@ -361,7 +360,7 @@ def process_commit_context(
                 organization_id=project.organization_id,
                 context={"commitId": commit.id},
                 defaults={
-                    "date_added": timezone.now()
+                    "date_added": datetime.now(tz=timezone.utc)
                 },  # Updates date of an existing owner, since we just matched them with this new event
             )
 
