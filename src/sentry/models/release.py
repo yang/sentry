@@ -112,11 +112,11 @@ class ReleaseProject(Model):
     class Meta:
         app_label = "sentry"
         db_table = "sentry_release_project"
-        index_together = (
-            ("project", "adopted"),
-            ("project", "unadopted"),
-            ("project", "first_seen_transaction"),
-        )
+        indexes = [
+            models.Index(fields=["project", "adopted"]),
+            models.Index(fields=["project", "unadopted"]),
+            models.Index(fields=["project", "first_seen_transaction"]),
+        ]
         unique_together = (("project", "release"),)
 
 
@@ -532,20 +532,30 @@ class Release(Model):
         # allow us to specify this on the model.
         # We also use a functional index to order `prerelease` according to semver rules,
         # which we can't express here for now.
-        index_together = (
-            ("organization", "package", "major", "minor", "patch", "revision", "prerelease"),
-            ("organization", "major", "minor", "patch", "revision", "prerelease"),
-            ("organization", "build_code"),
-            ("organization", "build_number"),
-            ("organization", "date_added"),
-            ("organization", "status"),
-        )
         indexes = [
+            models.Index(
+                fields=[
+                    "organization",
+                    "package",
+                    "major",
+                    "minor",
+                    "patch",
+                    "revision",
+                    "prerelease",
+                ]
+            ),
+            models.Index(
+                fields=["organization", "major", "minor", "patch", "revision", "prerelease"]
+            ),
+            models.Index(fields=["organization", "build_code"]),
+            models.Index(fields=["organization", "build_number"]),
+            models.Index(fields=["organization", "date_added"]),
+            models.Index(fields=["organization", "status"]),
             models.Index(
                 fields=["organization", "version"],
                 opclasses=["", "text_pattern_ops"],
                 name="sentry_release_version_btree",
-            )
+            ),
         ]
 
     __repr__ = sane_repr("organization_id", "version")

@@ -185,7 +185,7 @@ class Incident(Model):
         app_label = "sentry"
         db_table = "sentry_incident"
         unique_together = (("organization", "identifier"),)
-        index_together = (("alert_rule", "type", "status"),)
+        indexes = [models.Index(fields=["alert_rule", "type", "status"])]
 
     @property
     def current_end_date(self):

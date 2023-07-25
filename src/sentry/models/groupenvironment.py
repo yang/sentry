@@ -1,4 +1,4 @@
-from django.db.models import DO_NOTHING, DateTimeField
+from django.db import models
 from django.db.models.signals import post_delete
 from django.utils import timezone
 
@@ -18,14 +18,14 @@ class GroupEnvironment(Model):
         db_constraint=False,
         # We have no index here, so we don't want to use the ORM's cascade
         # delete functionality
-        on_delete=DO_NOTHING,
+        on_delete=models.DO_NOTHING,
     )
-    first_seen = DateTimeField(default=timezone.now, db_index=True, null=True)
+    first_seen = models.DateTimeField(default=timezone.now, db_index=True, null=True)
 
     class Meta:
         app_label = "sentry"
         db_table = "sentry_groupenvironment"
-        index_together = [("environment", "first_release")]
+        indexes = [models.Index(fields=["environment", "first_release"])]
         unique_together = [("group", "environment")]
 
     __repr__ = sane_repr("group_id", "environment_id")
