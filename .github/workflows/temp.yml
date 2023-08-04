@@ -25,7 +25,7 @@ jobs:
 
       - name: /etc/hosts
         run: |
-            echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/host
+            echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
       - name: Run test
         run: |
