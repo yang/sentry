@@ -23,6 +23,10 @@ jobs:
           kafka: true
           symbolicator: true
 
+      - name: /etc/hosts
+        run: |
+            echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/host
+
       - name: Run test
         run: |
           pytest tests/symbolicator/test_payload_full.py::SymbolicatorResolvingIntegrationTest::test_real_resolving
