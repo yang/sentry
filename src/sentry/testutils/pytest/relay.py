@@ -61,10 +61,16 @@ def relay_server_setup(live_server, tmpdir_factory):
     else:
         port = "80"
 
-    upstream_host = "http://host.docker.internal:%s/" % port
-    kafka_host = "sentry_kafka"
-    redis_host = "sentry_redis"
-    network = "sentry"
+    if sys.platform.startswith("linux"):
+        upstream_host = "http://127.0.0.1:%s/" % port
+        kafka_host = "127.0.0.1"
+        redis_host = "127.0.0.1"
+        network = "host"
+    else:
+        upstream_host = "http://host.docker.internal:%s/" % port
+        kafka_host = "sentry_kafka"
+        redis_host = "sentry_redis"
+        network = "sentry"
 
     template_path = _get_template_dir()
     sources = ["config.yml", "credentials.json"]
