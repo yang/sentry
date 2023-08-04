@@ -280,10 +280,18 @@ class PushEventWebhookTest(APITestCase):
 
     @with_feature("organizations:auto-repo-linking")
     @patch("sentry.integrations.github.webhook.metrics")
-    def test_multiple_orgs_creates_missing_repos(self, mock_metrics):
+    def test_multiple_orgs_creates_missing_repo(self, mock_metrics):
         project = self.project  # force creation
 
         org2 = self.create_organization()
+
+        repo = self.create_repo(
+            project=project,
+            provider="integrations:github",
+            name="baxterthehacker/public-repo",
+        )
+        repo.external_id = "35129377"
+        repo.save()
 
         future_expires = datetime.now().replace(microsecond=0) + timedelta(minutes=5)
         with assume_test_silo_mode(SiloMode.CONTROL):
@@ -467,6 +475,14 @@ class PullRequestEventWebhook(APITestCase):
         project = self.project  # force creation
 
         org2 = self.create_organization()
+
+        repo = self.create_repo(
+            project=project,
+            provider="integrations:github",
+            name="baxterthehacker/public-repo",
+        )
+        repo.external_id = "35129377"
+        repo.save()
 
         future_expires = datetime.now().replace(microsecond=0) + timedelta(minutes=5)
         with assume_test_silo_mode(SiloMode.CONTROL):

@@ -89,13 +89,14 @@ class Webhook:
             }
 
             # TODO: Replace with repository_service; deal with potential multiple regions
+            org_ids = set(orgs.keys())
             repos = Repository.objects.filter(
-                organization_id__in=orgs.keys(),
+                organization_id__in=org_ids,
                 provider=f"integrations:{self.provider}",
                 external_id=str(event["repository"]["id"]),
             )
 
-            if not repos.exists():
+            if not repos.exists() or len(repos) < len(org_ids):
                 provider = get_integration_repository_provider(integration)
 
                 config = {
@@ -104,7 +105,12 @@ class Webhook:
                     "identifier": event.get("repository", {}).get("full_name", None),
                 }
 
-                for org in orgs.values():
+                missing_repo_orgs = org_ids.difference(
+                    set(repos.values_list("organization_id", flat=True))
+                )
+
+                for org_id in missing_repo_orgs:
+                    org = orgs[org_id]
                     if features.has("organizations:auto-repo-linking", org):
                         try:
                             provider.create_repository(config, org)
