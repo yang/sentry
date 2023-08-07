@@ -33,10 +33,6 @@ import {SchemaFormConfig} from 'sentry/views/settings/organizationIntegrations/s
 
 const NOTIFY_EMAIL_ACTION = 'sentry.mail.actions.NotifyEmailAction';
 
-export function hasStreamlineTargeting(organization: Organization): boolean {
-  return organization.features.includes('streamline-targeting-context');
-}
-
 interface FieldProps {
   data: Props['data'];
   disabled: boolean;
@@ -121,10 +117,6 @@ function MailActionFields({
   onMemberTeamChange,
 }: FieldProps) {
   const isInitialized = data.targetType !== undefined && `${data.targetType}`.length > 0;
-  let issueOwnersLabel = t('Issue Owners');
-  if (hasStreamlineTargeting(organization)) {
-    issueOwnersLabel = t('Suggested Assignees');
-  }
   return (
     <MemberTeamFields
       disabled={disabled}
@@ -134,7 +126,7 @@ function MailActionFields({
       ruleData={data as IssueAlertRuleAction}
       onChange={onMemberTeamChange}
       options={[
-        {value: MailActionTargetType.ISSUE_OWNERS, label: issueOwnersLabel},
+        {value: MailActionTargetType.ISSUE_OWNERS, label: t('Suggested Assignees')},
         {value: MailActionTargetType.TEAM, label: t('Team')},
         {value: MailActionTargetType.MEMBER, label: t('Member')},
       ]}

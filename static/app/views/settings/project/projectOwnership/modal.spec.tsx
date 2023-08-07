@@ -56,31 +56,11 @@ describe('Project Ownership', () => {
     MockApiClient.clearMockResponses();
   });
 
-  it('renders stacktrace suggestions', () => {
+  it('renders suggestions', () => {
     render(
       <ProjectOwnershipModal
         issueId={issueId}
         organization={org}
-        project={project}
-        eventData={event}
-        onCancel={() => {}}
-      />
-    );
-
-    // Rule builder
-    expect(screen.getByLabelText('Rule pattern')).toBeInTheDocument();
-
-    expect(screen.getByText(/Match against Issue Data/)).toBeInTheDocument();
-    // First in-app (default reverse order) frame is suggested
-    expect(screen.getByText('raven/base.py')).toBeInTheDocument();
-    expect(screen.getByText('https://example.com/path')).toBeInTheDocument();
-  });
-
-  it('renders streamline-targeting-context suggestions', () => {
-    render(
-      <ProjectOwnershipModal
-        issueId={issueId}
-        organization={{...org, features: ['streamline-targeting-context']}}
         project={project}
         eventData={event}
         onCancel={() => {}}
@@ -100,9 +80,6 @@ describe('Project Ownership', () => {
     expect(
       screen.getByText(`url:*/path ${user.email}`, {exact: false})
     ).toBeInTheDocument();
-
-    // Rule builder hidden TODO: remove when streamline-targeting-context is GA
-    expect(screen.queryByLabelText('Rule pattern')).not.toBeInTheDocument();
   });
 
   it('can cancel', async () => {
