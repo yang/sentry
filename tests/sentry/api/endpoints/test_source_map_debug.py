@@ -160,7 +160,8 @@ class SourceMapDebugEndpointTestCase(APITestCase):
                                         "colno": 39,
                                         "context_line": "function foo() {",
                                         "data": {
-                                            "sourcemap": "https://media.sentry.io/_static/29e365f8b0d923bc123e8afa38d890c3/sentry/dist/vendor.js.map"
+                                            "sourcemap": "https://media.sentry.io/_static/29e365f8b0d923bc123e8afa38d890c3/sentry/dist/vendor.js.map",
+                                            "symbolicated": True,
                                         },
                                     }
                                 ]

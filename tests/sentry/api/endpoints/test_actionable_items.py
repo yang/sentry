@@ -1,17 +1,8 @@
-from django.core.files.base import ContentFile
 from django.utils import timezone
 from rest_framework import status
 
 from sentry.api.helpers.actionable_items_helper import get_file_extension, is_frame_filename_valid
-from sentry.models import (
-    Distribution,
-    EventError,
-    File,
-    PromptsActivity,
-    Release,
-    ReleaseFile,
-    SourceMapProcessingIssue,
-)
+from sentry.models import EventError, PromptsActivity, SourceMapProcessingIssue
 from sentry.testutils.cases import APITestCase
 from sentry.testutils.helpers import with_feature
 from sentry.testutils.silo import region_silo_test
@@ -344,8 +335,6 @@ class ActionableItemsEndpointTestCase(APITestCase):
         event = self.store_event(
             data={
                 "event_id": "a" * 32,
-                "release": "my-release",
-                "dist": "my-dist",
                 "sdk": {
                     "name": "sentry.javascript.browser",
                     "version": "7.3.0",
@@ -357,13 +346,20 @@ class ActionableItemsEndpointTestCase(APITestCase):
                             "stacktrace": {
                                 "frames": [
                                     {
-                                        "abs_path": "https://example.com/application.js",
+                                        "abs_path": "https://app.example.com/static/js/main.fa8fe19f.js",
+                                        "filename": "/static/js/main.fa8fe19f.js",
                                         "lineno": 1,
                                         "colno": 39,
+                                        "context_line": "function foo() {",
+                                        "in_app": True,
+                                        "data": {
+                                            "sourcemap": "https://media.sentry.io/_static/29e365f8b0d923bc123e8afa38d890c3/sentry/dist/vendor.js.map",
+                                            "symbolicated": True,
+                                        },
                                     }
                                 ]
                             },
-                        }
+                        },
                     ]
                 },
                 "errors": [
@@ -375,36 +371,6 @@ class ActionableItemsEndpointTestCase(APITestCase):
             project_id=self.project.id,
             assert_no_errors=False,
         )
-        release = Release.objects.get(organization=self.organization, version=event.release)
-        release.update(user_agent="test_user_agent")
-
-        dist = Distribution.objects.get(
-            organization_id=self.organization.id, name="my-dist", release_id=release.id
-        )
-
-        file = File.objects.create(name="application.js", type="release.file")
-        fileobj = ContentFile(b"a\n//# sourceMappingURL=application.js.map")
-        file.putfile(fileobj)
-
-        ReleaseFile.objects.create(
-            organization_id=self.project.organization_id,
-            release_id=release.id,
-            file=file,
-            name="~/application.js",
-            dist_id=dist.id,
-        )
-
-        ReleaseFile.objects.create(
-            organization_id=self.project.organization_id,
-            release_id=release.id,
-            file=file,
-            name="~/application.js.map",
-            dist_id=dist.id,
-        )
-
-        sourcemapfile = File.objects.create(name="application.js.map", type="release.file")
-        sourcemapfileobj = ContentFile(b"mapping code")
-        sourcemapfile.putfile(sourcemapfileobj)
 
         resp = self.get_success_response(
             self.organization.slug,

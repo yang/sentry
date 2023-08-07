@@ -33,7 +33,7 @@ def source_map_debug(project, event_id, exception_idx, frame_idx):
     except IndexError:
         raise ParseError(detail="Query parameter 'exception_idx' is out of bounds")
     frame, filename, abs_path = _get_frame_filename_and_path(exception, frame_idx)
-    if frame.data and "sourcemap" in frame.data:
+    if frame.data and frame.data.get("symbolicated"):
         # already mapped
         return SourceMapDebug()
 
