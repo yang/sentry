@@ -59,7 +59,7 @@ def source_map_debug(project, event_id, exception_idx, frame_idx):
 
     urlparts = urlparse(abs_path)
 
-    if not (urlparts.scheme and urlparts.path):
+    if not (urlparts.scheme and urlparts.path) and sdk_info != "sentry.javascript.node":
         return SourceMapDebug(
             issue=SourceMapProcessingIssue.URL_NOT_VALID, data={"absPath": abs_path}
         )
