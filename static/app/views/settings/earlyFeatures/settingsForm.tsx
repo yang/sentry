@@ -13,6 +13,7 @@ import DeprecatedAsyncComponent, {
 } from 'sentry/components/deprecatedAsyncComponent';
 import Form from 'sentry/components/forms/form';
 import JsonForm from 'sentry/components/forms/jsonForm';
+import {JsonFormObject} from 'sentry/components/forms/types';
 import HookOrDefault from 'sentry/components/hookOrDefault';
 import {Hovercard} from 'sentry/components/hovercard';
 import Tag from 'sentry/components/tag';
@@ -22,7 +23,6 @@ import {t} from 'sentry/locale';
 import {space} from 'sentry/styles/space';
 import type {Organization, OrganizationAuthProvider, Scope} from 'sentry/types';
 import withOrganization from 'sentry/utils/withOrganization';
-import {JsonFormObject} from 'sentry/components/forms/types';
 
 const HookCodecovSettingsLink = HookOrDefault({
   hookName: 'component:codecov-integration-settings-link',
@@ -38,7 +38,7 @@ interface Props extends RouteComponentProps<{}, {}> {
 
 interface State extends AsyncComponentState {
   authProvider: OrganizationAuthProvider;
-  featureFlags: {[key: string]: {value: boolean; description: string}};
+  featureFlags: {[key: string]: {description: string; value: boolean}};
 }
 
 class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
@@ -74,7 +74,7 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
       })),
     };
     return (
-      <>
+      <React.Fragment>
         <Form
           data-test-id="organization-settings"
           apiMethod="PUT"
@@ -100,7 +100,7 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
             disabled={!access.has('org:write')}
           />
         </Form>
-      </>
+      </React.Fragment>
     );
   }
 }

@@ -8,7 +8,6 @@ from sentry.api.base import Endpoint, all_silo_endpoint
 from sentry.api.permissions import SuperuserPermission
 from sentry.app import env
 from sentry.conf.server import SENTRY_FEATURES_DESCRIPTIONS
-from django.conf import settings
 
 
 @all_silo_endpoint

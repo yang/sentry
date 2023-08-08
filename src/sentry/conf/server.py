@@ -1316,6 +1316,15 @@ if os.environ.get("OPENAPIGENERATE", False):
 CRISPY_TEMPLATE_PACK = "bootstrap3"
 # Sentry and internal client configuration
 
+SENTRY_FEATURES_DESCRIPTIONS = {
+    "auth:register": "Enables user registration.",
+    "organizations:actionable-items": "Enables actionable items alerts and endpoint",
+    "organizations:alert-allow-indexed": "Enables alert creation on indexed events in UI (use for PoC/testing only)",
+    "organizations:javascript-console-error-tag": "Enables tagging javascript errors from the browser console.",
+    "organizations:auto-enable-codecov": "Enables the cron job to auto-enable codecov integrations.",
+    "organizations:integrations-auto-repo-linking": "Enables automatically linking repositories using commit webhook data",
+}
+
 SENTRY_FEATURES = {
     # Enables user registration.
     "auth:register": True,
