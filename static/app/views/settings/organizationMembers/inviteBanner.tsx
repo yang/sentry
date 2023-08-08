@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import {promptsCheck, promptsUpdate} from 'sentry/actionCreators/prompts';
 import {Button} from 'sentry/components/button';
 import Card from 'sentry/components/card';
+import Carousel from 'sentry/components/carousel';
 import {openConfirmModal} from 'sentry/components/confirm';
 import {DropdownMenu, MenuItemProps} from 'sentry/components/dropdownMenu';
 import ExternalLink from 'sentry/components/links/externalLink';
@@ -150,7 +151,7 @@ export function InviteBanner({missingMembers, onSendInvite, organization}: Props
           />
         </ButtonContainer>
       </CardTitleContainer>
-      <MemberCardsContainer>{cards}</MemberCardsContainer>
+      <Carousel>{cards}</Carousel>
     </StyledCard>
   );
 }
@@ -242,11 +243,11 @@ const MemberCard = styled(Card)`
   align-items: center;
 `;
 
-const MemberCardsContainer = styled('div')`
-  position: relative;
-  display: flex;
-  overflow-x: scroll;
-`;
+// const MemberCardsContainer = styled('div')`
+//   position: relative;
+//   display: flex;
+//   overflow-x: scroll;
+// `;
 
 const MemberCardContent = styled('div')`
   display: flex;
