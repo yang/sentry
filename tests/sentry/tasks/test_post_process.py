@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import time
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
 from unittest import mock
@@ -43,6 +44,7 @@ from sentry.models.groupowner import (
 from sentry.models.projectownership import ProjectOwnership
 from sentry.models.projectteam import ProjectTeam
 from sentry.ownership.grammar import Matcher, Owner, Rule, dump_schema
+from sentry.replays.lib import kafka as replays_kafka
 from sentry.rules import init_registry
 from sentry.services.hybrid_cloud.user.service import user_service
 from sentry.silo import unguarded_write
@@ -61,6 +63,7 @@ from sentry.testutils.performance_issues.store_transaction import PerfIssueTrans
 from sentry.testutils.silo import region_silo_test
 from sentry.types.activity import ActivityType
 from sentry.types.group import GroupSubStatus
+from sentry.utils import json
 from sentry.utils.cache import cache
 from tests.sentry.issues.test_utils import OccurrenceTestMixin
 
@@ -1596,6 +1599,69 @@ class SDKCrashMonitoringTestMixin(BasePostProgressGroupMixin):
         mock_sdk_crash_detection.detect_sdk_crash.assert_not_called()
 
 
+@mock.patch.object(replays_kafka, "get_kafka_producer_cluster_options")
+@mock.patch.object(replays_kafka, "KafkaPublisher")
+class ReplayLinkageTestMixin(BasePostProgressGroupMixin):
+    def test_replay_linkage(self, kafka_producer, kafka_publisher):
+        replay_id = uuid.uuid4().hex
+        event = self.create_event(
+            data={"message": "testing", "contexts": {"replay": {"replay_id": replay_id}}},
+            project_id=self.project.id,
+        )
+
+        with self.options({"replay.ingest.event-linking-rate": 1}):
+            self.call_post_process_group(
+                is_new=True,
+                is_regression=False,
+                is_new_group_environment=True,
+                event=event,
+            )
+            assert kafka_producer.return_value.publish.call_count == 1
+            assert kafka_producer.return_value.publish.call_args[0][0] == "ingest-replay-events"
+            assert json.loads(kafka_producer.return_value.publish.call_args[0][1]) == {
+                "type": "replay_event",
+                "timestamp": event.timestamp,
+                "replay_id": replay_id,
+                "project_id": self.project.id,
+                "segment_id": None,
+                "retention_days": 90,
+                "payload": {
+                    "replay_id": replay_id,
+                    "event_id": event.event_id,
+                },
+            }
+
+    def test_no_replay(self, kafka_producer, kafka_publisher):
+        event = self.create_event(
+            data={"message": "testing"},
+            project_id=self.project.id,
+        )
+
+        with self.options({"replay.ingest.event-linking-rate": 1}):
+            self.call_post_process_group(
+                is_new=True,
+                is_regression=False,
+                is_new_group_environment=True,
+                event=event,
+            )
+            assert kafka_producer.return_value.publish.call_count == 0
+
+    def test_0_sample_rate_replays(self, kafka_producer, kafka_publisher):
+        event = self.create_event(
+            data={"message": "testing"},
+            project_id=self.project.id,
+        )
+
+        with self.options({"replay.ingest.event-linking-rate": 0}):
+            self.call_post_process_group(
+                is_new=True,
+                is_regression=False,
+                is_new_group_environment=True,
+                event=event,
+            )
+            assert kafka_producer.return_value.publish.call_count == 0
+
+
 @region_silo_test
 class PostProcessGroupErrorTest(
     TestCase,
@@ -1609,6 +1675,7 @@ class PostProcessGroupErrorTest(
     ServiceHooksTestMixin,
     SnoozeTestMixin,
     SDKCrashMonitoringTestMixin,
+    ReplayLinkageTestMixin,
 ):
     def create_event(self, data, project_id, assert_no_errors=True):
         return self.store_event(data=data, project_id=project_id, assert_no_errors=assert_no_errors)
@@ -1876,4 +1943,5 @@ class PostProcessGroupGenericTest(
 
     @pytest.mark.skip(reason="those tests do not work with the given call_post_process_group impl")
     def test_processing_cache_cleared_with_commits(self):
+        pass
         pass

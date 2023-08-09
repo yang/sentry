@@ -1600,6 +1600,7 @@ SENTRY_FEATURES = {
     "organizations:session-replay-issue-emails": False,
     "organizations:session-replay-weekly-email": False,
     "organizations:session-replay-trace-table": False,
+    "organizations:session-replay-event-linking": False,
     # Enable rage click and dead click columns in replay list.
     "organizations:replay-rage-click-dead-click-columns": False,
     # Enable experimental error and rage/dead click cards in replay list.

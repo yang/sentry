@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from datetime import datetime, timedelta
 from time import time
 from typing import TYPE_CHECKING, List, Mapping, Optional, Sequence, Tuple, TypedDict, Union
@@ -11,15 +12,16 @@ from django.db.models.signals import post_save
 from django.utils import timezone
 from google.api_core.exceptions import ServiceUnavailable
 
-from sentry import features
+from sentry import features, options
 from sentry.exceptions import PluginError
 from sentry.issues.grouptype import GroupCategory
 from sentry.issues.issue_occurrence import IssueOccurrence
 from sentry.killswitches import killswitch_matches_context
+from sentry.replays.lib.kafka import initialize_replays_publisher
 from sentry.signals import event_processed, issue_unignored, transaction_processed
 from sentry.silo import SiloMode
 from sentry.tasks.base import instrumented_task
-from sentry.utils import metrics
+from sentry.utils import json, metrics
 from sentry.utils.cache import cache
 from sentry.utils.event_frames import get_sdk_name
 from sentry.utils.locking import UnableToAcquireLock
@@ -820,6 +822,48 @@ def process_snoozes(job: PostProcessJob) -> None:
         return
 
 
+def process_replay_link(job: PostProcessJob) -> None:
+    if job["is_reprocessed"]:
+        return
+
+    sample_rate = options.get("replay.ingest.event-linking-rate")
+    if not sample_rate:
+        return
+
+    if random.random() > sample_rate:
+        return
+
+    metrics.incr("post_process.process_replay_link.id_sampled")
+
+    group_event = job["event"]
+    if not group_event.data.get("contexts", {}).get("replay", {}).get("replay_id"):
+        return
+
+    metrics.incr("post_process.process_replay_link.id_exists")
+
+    replay_id = group_event.data["contexts"]["replay"]["replay_id"]
+
+    publisher = initialize_replays_publisher(is_async=True)
+    publisher.publish(
+        "ingest-replay-events",
+        json.dumps(
+            {
+                "type": "replay_event",
+                "timestamp": group_event.timestamp,
+                # start_time
+                "replay_id": replay_id,
+                "project_id": group_event.project_id,
+                "segment_id": None,
+                "retention_days": 90,  # TODO
+                "payload": {
+                    "replay_id": replay_id,
+                    "event_id": group_event.data["event_id"],
+                },
+            }
+        ),
+    )
+
+
 def process_rules(job: PostProcessJob) -> None:
     if job["is_reprocessed"]:
         return
@@ -1131,6 +1175,7 @@ GROUP_CATEGORY_POST_PROCESS_PIPELINE = {
         update_existing_attachments,
         fire_error_processed,
         sdk_crash_monitoring,
+        process_replay_link,
     ],
 }
 
