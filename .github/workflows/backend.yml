@@ -67,7 +67,7 @@ jobs:
     needs: files-changed
     name: backend test
     runs-on: ubuntu-20.04
-    timeout-minutes: 40
+    timeout-minutes: 80
     strategy:
       # This helps not having to run multiple jobs because one fails, thus, reducing resource usage
       # and reducing the risk that one of many runs would turn red again (read: intermittent tests)
@@ -94,6 +94,10 @@ jobs:
           contains( github.event.pull_request.labels.*.name, 'Trigger: Silo db' )
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
+
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
 
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
@@ -142,6 +146,10 @@ jobs:
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
 
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
+
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
         id: setup
@@ -178,6 +186,10 @@ jobs:
           contains( github.event.pull_request.labels.*.name, 'Trigger: Silo db' )
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
+
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
 
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
@@ -338,6 +350,10 @@ jobs:
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
 
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
+
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
         id: setup
@@ -366,6 +382,10 @@ jobs:
           contains( github.event.pull_request.labels.*.name, 'Trigger: Silo db' )
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
+
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
 
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
@@ -397,7 +417,7 @@ jobs:
     needs: files-changed
     name: snuba test
     runs-on: ubuntu-20.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       # This helps not having to run multiple jobs because one fails, thus, reducing resource usage
       # and reducing the risk that one of many runs would turn red again (read: intermittent tests)
@@ -421,6 +441,10 @@ jobs:
           contains( github.event.pull_request.labels.*.name, 'Trigger: Silo db' )
         run: |
           echo "SENTRY_USE_SPLIT_DBS=1" >> "$GITHUB_ENV"
+
+      - name: Update environment for silo tests
+        run: |
+          echo "SENTRY_FORCE_SILOED_TESTS=1" >> "$GITHUB_ENV"
 
       - name: Setup sentry env
         uses: ./.github/actions/setup-sentry
