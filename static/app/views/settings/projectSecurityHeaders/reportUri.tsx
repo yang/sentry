@@ -21,11 +21,11 @@ export function getSecurityDsn(keyList: ProjectKey[]) {
 
 type Props = {
   keyList: ProjectKey[];
-  orgId: string;
-  projectId: string;
+  orgSlug: string;
+  projectSlug: string;
 };
 
-export default function ReportUri({keyList, orgId, projectId}: Props) {
+export default function ReportUri({keyList, orgSlug, projectSlug}: Props) {
   return (
     <Panel>
       <PanelHeader>{t('Report URI')}</PanelHeader>
@@ -34,7 +34,7 @@ export default function ReportUri({keyList, orgId, projectId}: Props) {
           {tct(
             "We've automatically pulled these credentials from your available [link:Client Keys]",
             {
-              link: <Link to={`/settings/${orgId}/projects/${projectId}/keys/`} />,
+              link: <Link to={`/settings/${orgSlug}/projects/${projectSlug}/keys/`} />,
             }
           )}
         </PanelAlert>

@@ -44,11 +44,11 @@ class HookStats extends DeprecatedAsyncComponent<StatsProps, StatsState> {
     const until = Math.floor(new Date().getTime() / 1000);
     const since = until - 3600 * 24 * 30;
     const {organization} = this.props;
-    const {hookId, projectId} = this.props.params;
+    const {hookId, projectId: projectSlug} = this.props.params;
     return [
       [
         'stats',
-        `/projects/${organization.slug}/${projectId}/hooks/${hookId}/stats/`,
+        `/projects/${organization.slug}/${projectSlug}/hooks/${hookId}/stats/`,
         {
           query: {
             since,
@@ -115,20 +115,20 @@ type State = {
 export default class ProjectServiceHookDetails extends DeprecatedAsyncView<Props, State> {
   getEndpoints(): ReturnType<DeprecatedAsyncComponent['getEndpoints']> {
     const {organization} = this.props;
-    const {projectId, hookId} = this.props.params;
-    return [['hook', `/projects/${organization.slug}/${projectId}/hooks/${hookId}/`]];
+    const {projectId: projectSlug, hookId} = this.props.params;
+    return [['hook', `/projects/${organization.slug}/${projectSlug}/hooks/${hookId}/`]];
   }
 
   onDelete = () => {
     const {organization} = this.props;
-    const {projectId, hookId} = this.props.params;
+    const {projectId: projectSlug, hookId} = this.props.params;
     addLoadingMessage(t('Saving changes\u2026'));
-    this.api.request(`/projects/${organization.slug}/${projectId}/hooks/${hookId}/`, {
+    this.api.request(`/projects/${organization.slug}/${projectSlug}/hooks/${hookId}/`, {
       method: 'DELETE',
       success: () => {
         clearIndicators();
         browserHistory.push(
-          normalizeUrl(`/settings/${organization.slug}/projects/${projectId}/hooks/`)
+          normalizeUrl(`/settings/${organization.slug}/projects/${projectSlug}/hooks/`)
         );
       },
       error: () => {
@@ -139,7 +139,7 @@ export default class ProjectServiceHookDetails extends DeprecatedAsyncView<Props
 
   renderBody() {
     const {organization, params} = this.props;
-    const {projectId, hookId} = params;
+    const {projectId: projectSlug, hookId} = params;
     const {hook} = this.state;
     if (!hook) {
       return null;
@@ -155,7 +155,7 @@ export default class ProjectServiceHookDetails extends DeprecatedAsyncView<Props
 
         <ServiceHookSettingsForm
           organization={organization}
-          projectId={projectId}
+          projectSlug={projectSlug}
           hookId={hookId}
           initialData={{
             ...hook,

@@ -54,8 +54,8 @@ class ProjectExpectCtReports extends DeprecatedAsyncView<Props, State> {
 
         <ReportUri
           keyList={keyList}
-          orgId={organization.slug}
-          projectId={params.projectId}
+          orgSlug={organization.slug}
+          projectSlug={params.projectId}
         />
 
         <Panel>

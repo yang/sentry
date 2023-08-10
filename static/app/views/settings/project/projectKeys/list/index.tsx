@@ -148,7 +148,7 @@ class ProjectKeys extends DeprecatedAsyncView<Props, State> {
 
   renderResults() {
     const {location, organization, project, routes, params} = this.props;
-    const {projectId} = params;
+    const {projectId: projectSlug} = params;
     const hasAccess = hasEveryAccess(['project:write'], {organization, project});
 
     return (
@@ -157,8 +157,8 @@ class ProjectKeys extends DeprecatedAsyncView<Props, State> {
           <KeyRow
             hasWriteAccess={hasAccess}
             key={key.id}
-            orgId={organization.slug}
-            projectId={projectId}
+            orgSlug={organization.slug}
+            projectSlug={projectSlug}
             project={this.props.project}
             data={key}
             onToggle={this.handleToggleKey}

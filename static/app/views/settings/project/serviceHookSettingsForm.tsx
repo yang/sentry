@@ -18,24 +18,24 @@ const EVENT_CHOICES = ['event.alert', 'event.created'];
 type Props = {
   initialData: Partial<ServiceHook> & {isActive: boolean};
   organization: Organization;
-  projectId: string;
+  projectSlug: string;
   hookId?: string;
 };
 
 export default class ServiceHookSettingsForm extends Component<Props> {
   onSubmitSuccess = () => {
-    const {organization, projectId} = this.props;
+    const {organization, projectSlug} = this.props;
     browserHistory.push(
-      normalizeUrl(`/settings/${organization.slug}/projects/${projectId}/hooks/`)
+      normalizeUrl(`/settings/${organization.slug}/projects/${projectSlug}/hooks/`)
     );
   };
 
   render() {
-    const {initialData, organization, projectId, hookId} = this.props;
+    const {initialData, organization, projectSlug, hookId} = this.props;
 
     const endpoint = hookId
-      ? `/projects/${organization.slug}/${projectId}/hooks/${hookId}/`
-      : `/projects/${organization.slug}/${projectId}/hooks/`;
+      ? `/projects/${organization.slug}/${projectSlug}/hooks/${hookId}/`
+      : `/projects/${organization.slug}/${projectSlug}/hooks/`;
 
     return (
       <Panel>

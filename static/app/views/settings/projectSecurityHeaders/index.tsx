@@ -68,8 +68,8 @@ class ProjectSecurityHeaders extends DeprecatedAsyncView<Props, State> {
 
         <ReportUri
           keyList={keyList}
-          projectId={params.projectId}
-          orgId={organization.slug}
+          projectSlug={params.projectId}
+          orgSlug={organization.slug}
         />
 
         <Panel>

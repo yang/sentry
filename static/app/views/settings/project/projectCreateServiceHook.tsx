@@ -22,7 +22,7 @@ function ProjectCreateServiceHook({organization, params}: Props) {
         <SettingsPageHeader title={title} />
         <ServiceHookSettingsForm
           organization={organization}
-          projectId={projectId}
+          projectSlug={projectId}
           initialData={{events: [], isActive: true}}
         />
       </Fragment>

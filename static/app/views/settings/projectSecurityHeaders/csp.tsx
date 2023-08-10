@@ -83,7 +83,11 @@ export default class ProjectCspReports extends DeprecatedAsyncView<Props, State>
 
         <PreviewFeature />
 
-        <ReportUri keyList={keyList} orgId={organization.slug} projectId={projectId} />
+        <ReportUri
+          keyList={keyList}
+          orgSlug={organization.slug}
+          projectSlug={projectId}
+        />
 
         <Form
           saveOnBlur

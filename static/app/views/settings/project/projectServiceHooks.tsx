@@ -26,17 +26,17 @@ import SettingsPageHeader from 'sentry/views/settings/components/settingsPageHea
 type RowProps = {
   hook: ServiceHook;
   onToggleActive: () => void;
-  orgId: string;
-  projectId: string;
+  orgSlug: string;
+  projectSlug: string;
 };
 
-function ServiceHookRow({orgId, projectId, hook, onToggleActive}: RowProps) {
+function ServiceHookRow({orgSlug, projectSlug, hook, onToggleActive}: RowProps) {
   return (
     <FieldGroup
       label={
         <Link
           data-test-id="project-service-hook"
-          to={`/settings/${orgId}/projects/${projectId}/hooks/${hook.id}/`}
+          to={`/settings/${orgSlug}/projects/${projectSlug}/hooks/${hook.id}/`}
         >
           <Truncate value={hook.url} />
         </Link>
@@ -131,8 +131,8 @@ class ProjectServiceHooks extends DeprecatedAsyncView<Props, State> {
           {this.state.hookList?.map(hook => (
             <ServiceHookRow
               key={hook.id}
-              orgId={organization.slug}
-              projectId={params.projectId}
+              orgSlug={organization.slug}
+              projectSlug={params.projectId}
               hook={hook}
               onToggleActive={this.onToggleActive.bind(this, hook)}
             />

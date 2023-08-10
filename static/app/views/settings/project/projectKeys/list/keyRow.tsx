@@ -22,9 +22,9 @@ type Props = {
   hasWriteAccess: boolean;
   onRemove: (data: ProjectKey) => void;
   onToggle: (isActive: boolean, data: ProjectKey) => void;
-  orgId: string;
+  orgSlug: string;
   project: Project;
-  projectId: string;
+  projectSlug: string;
 } & Pick<RouteComponentProps<{}, {}>, 'routes' | 'location' | 'params'>;
 
 function KeyRow({
@@ -94,7 +94,7 @@ function KeyRow({
       >
         <StyledPanelBody disabled={!data.isActive}>
           <ProjectKeyCredentials
-            projectId={`${data.projectId}`}
+            projectSlug={`${data.projectId}`}
             data={data}
             showMinidump={!isJsPlatform}
             showUnreal={!isJsPlatform}
