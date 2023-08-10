@@ -12,7 +12,10 @@ import {ProjectKey} from 'sentry/views/settings/project/projectKeys/types';
 
 type Props = {
   data: ProjectKey;
-  projectSlug: string;
+  /**
+   * This actually is the project ID, not the project slug
+   */
+  projectId: string;
   showDsn?: boolean;
   showDsnPublic?: boolean;
   showMinidump?: boolean;
@@ -25,7 +28,7 @@ type Props = {
 
 function ProjectKeyCredentials({
   data,
-  projectSlug,
+  projectId,
   showDsn = true,
   showDsnPublic = true,
   showMinidump = true,
@@ -186,7 +189,7 @@ function ProjectKeyCredentials({
         <FieldGroup label={t('Project ID')} inline flexibleControlStateSize>
           <TextCopyInput>
             {getDynamicText({
-              value: projectSlug,
+              value: projectId,
               fixed: '__PROJECTID__',
             })}
           </TextCopyInput>

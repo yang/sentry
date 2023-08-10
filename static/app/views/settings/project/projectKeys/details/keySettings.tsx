@@ -143,7 +143,7 @@ export function KeySettings({
                 </PanelAlert>
 
                 <ProjectKeyCredentials
-                  projectSlug={`${data.projectId}`}
+                  projectId={`${data.projectId}`}
                   data={data}
                   showPublicKey
                   showSecretKey

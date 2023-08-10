@@ -94,7 +94,7 @@ function KeyRow({
       >
         <StyledPanelBody disabled={!data.isActive}>
           <ProjectKeyCredentials
-            projectSlug={`${data.projectId}`}
+            projectId={`${data.projectId}`}
             data={data}
             showMinidump={!isJsPlatform}
             showUnreal={!isJsPlatform}
