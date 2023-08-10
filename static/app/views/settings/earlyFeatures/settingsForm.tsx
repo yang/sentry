@@ -2,7 +2,7 @@ import {RouteComponentProps} from 'react-router';
 import styled from '@emotion/styled';
 import {Location} from 'history';
 import cloneDeep from 'lodash/cloneDeep';
-
+import {Fragment} from 'react';
 import {addErrorMessage} from 'sentry/actionCreators/indicator';
 import {updateOrganization} from 'sentry/actionCreators/organizations';
 import Feature from 'sentry/components/acl/feature';
@@ -30,7 +30,7 @@ const HookCodecovSettingsLink = HookOrDefault({
 
 interface Props extends RouteComponentProps<{}, {}> {
   access: Set<Scope>;
-  initialData: Organization;
+  // initialData: Organization;
   location: Location;
   onSave: (previous: Organization, updated: Organization) => void;
   organization: Organization;
@@ -41,7 +41,7 @@ interface State extends AsyncComponentState {
   featureFlags: {[key: string]: {description: string; value: boolean}};
 }
 
-class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
+class EarlyFeaturesSettingsForm extends DeprecatedAsyncComponent<Props, State> {
   getEndpoints(): ReturnType<DeprecatedAsyncComponent['getEndpoints']> {
     const {organization} = this.props;
     return [
@@ -51,10 +51,19 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
   }
 
   render() {
-    const {initialData, organization, onSave, access} = this.props;
+    const {organization, onSave, access} = this.props;
     const {authProvider, featureFlags} = this.state;
-    const endpoint = `/organizations/${organization.slug}/`;
-
+    const endpoint = `/internal/feature-flags/`;
+    const initialData = Object.entries(featureFlags || {}).reduce(
+      (acc, [flag, obj]) => {
+        acc[flag] = obj.value;
+        return acc;
+      },
+      {} as {
+        [key: string]: boolean;
+      }
+    );
+    console.log({initialData});
     const jsonFormSettings = {
       additionalFieldProps: {hasSsoEnabled: !!authProvider},
       features: new Set(organization.features),
@@ -62,8 +71,6 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
       location: this.props.location,
       disabled: !access.has('org:write'),
     };
-
-    const forms = cloneDeep(organizationSettingsFields);
 
     const featuresForm: JsonFormObject = {
       title: t('Early Adopter Features'),
@@ -74,7 +81,7 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
       })),
     };
     return (
-      <React.Fragment>
+      <Fragment>
         <Form
           data-test-id="organization-settings"
           apiMethod="PUT"
@@ -82,38 +89,13 @@ class OrganizationSettingsForm extends DeprecatedAsyncComponent<Props, State> {
           saveOnBlur
           allowUndo
           initialData={initialData}
-          onSubmitSuccess={(updated, _model) => {
-            // Special case for slug, need to forward to new slug
-            if (typeof onSave === 'function') {
-              onSave(initialData, updated);
-            }
-          }}
           onSubmitError={() => addErrorMessage('Unable to save change')}
         >
-          <JsonForm {...jsonFormSettings} forms={forms} />
-          <AvatarChooser
-            type="organization"
-            allowGravatar={false}
-            endpoint={`${endpoint}avatar/`}
-            model={initialData}
-            onSave={updateOrganization}
-            disabled={!access.has('org:write')}
-          />
+          <JsonForm {...jsonFormSettings} forms={[featuresForm]} />
         </Form>
-      </React.Fragment>
+      </Fragment>
     );
   }
 }
 
-export default withOrganization(OrganizationSettingsForm);
-
-const PoweredByCodecov = styled('div')`
-  display: flex;
-  align-items: center;
-  gap: ${space(0.5)};
-
-  & > span {
-    display: flex;
-    align-items: center;
-  }
-`;
+export default withOrganization(EarlyFeaturesSettingsForm);

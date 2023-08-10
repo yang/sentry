@@ -64,19 +64,6 @@ function OrganizationGeneralSettings(props: Props) {
     }
   };
 
-  const handleConfirmRemoveOrg = () => {
-    if (!organization) {
-      return;
-    }
-
-    addLoadingMessage();
-    removeAndRedirectToRemainingOrganization(api, {
-      orgId: organization.slug,
-      successMessage: `${organization.name} is queued for deletion.`,
-      errorMessage: `Error removing the ${organization.name} organization`,
-    });
-  };
-
   return (
     <Fragment>
       <SentryDocumentTitle title={t('General Settings')} orgSlug={organization.slug} />
@@ -84,12 +71,7 @@ function OrganizationGeneralSettings(props: Props) {
         <SettingsPageHeader title={t('Early Features')} />
         <PermissionAlert />
 
-        <EarlyFeaturesSettingsForm
-          {...props}
-          initialData={organization}
-          access={access}
-          onSave={handleSaveForm}
-        />
+        <EarlyFeaturesSettingsForm {...props} access={access} onSave={handleSaveForm} />
       </div>
     </Fragment>
   );
