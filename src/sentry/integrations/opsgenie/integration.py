@@ -17,7 +17,10 @@ from sentry.integrations.base import (
     IntegrationMetadata,
     IntegrationProvider,
 )
+from sentry.models import Integration
+from sentry.models.integrations.organization_integration import OrganizationIntegration
 from sentry.pipeline import PipelineView
+from sentry.services.hybrid_cloud.organization import RpcOrganizationSummary
 from sentry.shared_integrations.exceptions import ApiError, IntegrationError
 from sentry.tasks.integrations import migrate_alert_rules
 from sentry.utils.http import absolute_uri
@@ -223,3 +226,27 @@ class OpsgenieIntegrationProvider(IntegrationProvider):
                 "domain_name": f"{name}.app.opsgenie.com",
             },
         }
+
+    def post_install(
+        self,
+        integration: Integration,
+        organization: RpcOrganizationSummary,
+        extra: Any | None = None,
+    ) -> None:
+        from sentry.services.hybrid_cloud.integration import integration_service
+
+        try:
+            org_integration = OrganizationIntegration.objects.get(
+                integration=integration, organization_id=organization.id
+            )
+
+        except OrganizationIntegration.DoesNotExist:
+            logger.exception("The Opsgenie post_install step failed.")
+            return
+
+        config = org_integration.config
+        config.update({"team_table": []})
+        org_integration = integration_service.update_organization_integration(
+            org_integration_id=org_integration.id,
+            config=config,
+        )  # type: ignore
