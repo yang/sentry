@@ -19,6 +19,7 @@ from sentry.integrations.base import (
 )
 from sentry.pipeline import PipelineView
 from sentry.shared_integrations.exceptions import ApiError, IntegrationError
+from sentry.tasks.integrations import migrate_alert_rules
 from sentry.utils.http import absolute_uri
 from sentry.web.helpers import render_to_response
 
@@ -64,8 +65,6 @@ metadata = IntegrationMetadata(
 class InstallationForm(forms.Form):
     base_url = forms.ChoiceField(
         label=_("Base URL"),
-        # help_text=_("Either https://api.opsgenie.com/ or https://api.eu.opsgenie.com/"),
-        # widget=forms.TextInput(attrs={"placeholder": "https://api.opsgenie.com/"}),
         choices=[
             ("https://api.opsgenie.com/", "api.opsgenie.com"),
             ("https://api.eu.opsgenie.com/", "api.eu.opsgenie.com"),
@@ -164,6 +163,14 @@ class OpsgenieIntegration(IntegrationInstallation):
                 raise ValidationError({"duplicate_name": ["Duplicate team name."]})
             team["id"] = str(self.org_integration.id) + "-" + team["team"]
         return super().update_organization_config(data)
+
+    def migrate_alert_rules(self):
+        migrate_alert_rules.apply_async(
+            kwargs={
+                "integration_id": self.model.id,
+                "organization_id": self.organization_id,
+            }
+        )
 
 
 class OpsgenieIntegrationProvider(IntegrationProvider):
