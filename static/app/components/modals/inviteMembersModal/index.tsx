@@ -40,13 +40,15 @@ interface State extends AsyncComponentState {
 
 const DEFAULT_ROLE = 'member';
 
-const InviteModalHook = HookOrDefault({
+export const InviteModalHook = HookOrDefault({
   hookName: 'member-invite-modal:customization',
   defaultComponent: ({onSendInvites, children}) =>
     children({sendInvites: onSendInvites, canSend: true}),
 });
 
-type InviteModalRenderFunc = React.ComponentProps<typeof InviteModalHook>['children'];
+export type InviteModalRenderFunc = React.ComponentProps<
+  typeof InviteModalHook
+>['children'];
 
 class InviteMembersModal extends DeprecatedAsyncComponent<
   InviteMembersModalProps,
@@ -495,7 +497,7 @@ const FooterContent = styled('div')`
   flex: 1;
 `;
 
-const StatusMessage = styled('div')<{status?: 'success' | 'error'}>`
+export const StatusMessage = styled('div')<{status?: 'success' | 'error'}>`
   display: flex;
   gap: ${space(1)};
   align-items: center;
