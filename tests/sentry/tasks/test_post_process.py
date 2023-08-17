@@ -3,16 +3,15 @@ from __future__ import annotations
 import abc
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest import mock
 from unittest.mock import Mock, patch
 
 import pytest
-import pytz
 from django.db import router
 from django.test import override_settings
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 
 from sentry import buffer
 from sentry.buffer.redis import RedisBuffer
@@ -587,7 +586,7 @@ class ResourceChangeBoundsTestMixin(BasePostProgressGroupMixin):
                 "message": "Foo bar",
                 "exception": {"type": "Foo", "value": "oh no"},
                 "level": "error",
-                "timestamp": iso_format(timezone.now()),
+                "timestamp": iso_format(django_timezone.now()),
             },
             project_id=self.project.id,
             assert_no_errors=False,
@@ -618,7 +617,11 @@ class ResourceChangeBoundsTestMixin(BasePostProgressGroupMixin):
     @patch("sentry.tasks.sentry_apps.process_resource_change_bound.delay")
     def test_processes_resource_change_task_not_called_for_non_errors(self, delay):
         event = self.create_event(
-            data={"message": "Foo bar", "level": "info", "timestamp": iso_format(timezone.now())},
+            data={
+                "message": "Foo bar",
+                "level": "info",
+                "timestamp": iso_format(django_timezone.now()),
+            },
             project_id=self.project.id,
             assert_no_errors=False,
         )
@@ -635,7 +638,11 @@ class ResourceChangeBoundsTestMixin(BasePostProgressGroupMixin):
     @patch("sentry.tasks.sentry_apps.process_resource_change_bound.delay")
     def test_processes_resource_change_task_not_called_without_feature_flag(self, delay):
         event = self.create_event(
-            data={"message": "Foo bar", "level": "info", "timestamp": iso_format(timezone.now())},
+            data={
+                "message": "Foo bar",
+                "level": "info",
+                "timestamp": iso_format(django_timezone.now()),
+            },
             project_id=self.project.id,
             assert_no_errors=False,
         )
@@ -657,7 +664,7 @@ class ResourceChangeBoundsTestMixin(BasePostProgressGroupMixin):
                 "message": "Foo bar",
                 "level": "error",
                 "exception": {"type": "Foo", "value": "oh no"},
-                "timestamp": iso_format(timezone.now()),
+                "timestamp": iso_format(django_timezone.now()),
             },
             project_id=self.project.id,
             assert_no_errors=False,
@@ -1422,7 +1429,9 @@ class SnoozeTestMixin(BasePostProgressGroupMixin):
         group.status = GroupStatus.IGNORED
         group.substatus = GroupSubStatus.UNTIL_CONDITION_MET
         group.save(update_fields=["status", "substatus"])
-        snooze = GroupSnooze.objects.create(group=group, until=timezone.now() - timedelta(hours=1))
+        snooze = GroupSnooze.objects.create(
+            group=group, until=django_timezone.now() - timedelta(hours=1)
+        )
 
         # Check for has_reappeared=True if is_new=False
         self.call_post_process_group(
@@ -1497,7 +1506,9 @@ class SnoozeTestMixin(BasePostProgressGroupMixin):
         group = event.group
         assert group.status == GroupStatus.UNRESOLVED
         assert group.substatus == GroupSubStatus.ONGOING
-        snooze = GroupSnooze.objects.create(group=group, until=timezone.now() + timedelta(hours=1))
+        snooze = GroupSnooze.objects.create(
+            group=group, until=django_timezone.now() + timedelta(hours=1)
+        )
 
         self.call_post_process_group(
             is_new=True,
@@ -1751,7 +1762,7 @@ class PostProcessGroupPerformanceTest(
         mock_processor,
         run_post_process_job_mock,
     ):
-        min_ago = before_now(minutes=1).replace(tzinfo=pytz.utc)
+        min_ago = before_now(minutes=1).replace(tzinfo=timezone.utc)
         event = self.store_transaction(
             project_id=self.project.id,
             user_id=self.create_user(name="user1").name,
@@ -1835,7 +1846,7 @@ class TransactionClustererTestCase(TestCase, SnubaTestCase):
         self,
         mock_store_transaction_name,
     ):
-        min_ago = before_now(minutes=1).replace(tzinfo=pytz.utc)
+        min_ago = before_now(minutes=1).replace(tzinfo=timezone.utc)
         event = process_event(
             data={
                 "project": self.project.id,
