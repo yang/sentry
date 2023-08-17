@@ -38,6 +38,7 @@ export interface JobTickData {
 }
 
 export type StatsBucket = {
+  [CheckInStatus.IN_PROGRESS]: number;
   [CheckInStatus.OK]: number;
   [CheckInStatus.MISSED]: number;
   [CheckInStatus.TIMEOUT]: number;
