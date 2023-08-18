@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import random
 from datetime import datetime, timedelta
 from time import time
 from typing import TYPE_CHECKING, List, Mapping, Optional, Sequence, Tuple, TypedDict, Union
@@ -12,7 +11,7 @@ from django.db.models.signals import post_save
 from django.utils import timezone
 from google.api_core.exceptions import ServiceUnavailable
 
-from sentry import features, options
+from sentry import features
 from sentry.exceptions import PluginError
 from sentry.issues.grouptype import GroupCategory
 from sentry.issues.issue_occurrence import IssueOccurrence
@@ -845,11 +844,10 @@ def process_replay_link(job: PostProcessJob) -> None:
     if job["is_reprocessed"]:
         return
 
-    sample_rate = options.get("replay.ingest.event-linking-rate")
-    if not sample_rate:
-        return
-
-    if random.random() > sample_rate:
+    if not features.has(
+        "organizations:session-replay-event-linking", job["event"].project.organization
+    ):
+        metrics.incr("post_process.process_replay_link.feature_not_enabled")
         return
 
     metrics.incr("post_process.process_replay_link.id_sampled")

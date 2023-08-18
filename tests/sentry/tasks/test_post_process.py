@@ -1620,7 +1620,7 @@ class ReplayLinkageTestMixin(BasePostProgressGroupMixin):
             project_id=self.project.id,
         )
 
-        with self.options({"replay.ingest.event-linking-rate": 1}):
+        with self.feature({"organizations:session-replay-event-linking": True}):
             self.call_post_process_group(
                 is_new=True,
                 is_regression=False,
@@ -1648,7 +1648,7 @@ class ReplayLinkageTestMixin(BasePostProgressGroupMixin):
             project_id=self.project.id,
         )
 
-        with self.options({"replay.ingest.event-linking-rate": 1}):
+        with self.feature({"organizations:session-replay-event-linking": True}):
             self.call_post_process_group(
                 is_new=True,
                 is_regression=False,
@@ -1663,7 +1663,7 @@ class ReplayLinkageTestMixin(BasePostProgressGroupMixin):
             project_id=self.project.id,
         )
 
-        with self.options({"replay.ingest.event-linking-rate": 0}):
+        with self.feature({"organizations:session-replay-event-linking": False}):
             self.call_post_process_group(
                 is_new=True,
                 is_regression=False,
