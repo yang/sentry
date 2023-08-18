@@ -1,15 +1,20 @@
 import {Fragment} from 'react';
+import styled from '@emotion/styled';
 
 import AlertLink from 'sentry/components/alertLink';
+import Badge from 'sentry/components/badge';
 import DeprecatedAsyncComponent from 'sentry/components/deprecatedAsyncComponent';
 import Form from 'sentry/components/forms/form';
 import JsonForm from 'sentry/components/forms/jsonForm';
 import FormModel from 'sentry/components/forms/model';
 import {FieldObject} from 'sentry/components/forms/types';
 import Link from 'sentry/components/links/link';
+import Panel from 'sentry/components/panels/panel';
+import PanelItem from 'sentry/components/panels/panelItem';
 import SentryDocumentTitle from 'sentry/components/sentryDocumentTitle';
-import {IconMail} from 'sentry/icons';
+import {IconChevron, IconMail} from 'sentry/icons';
 import {t} from 'sentry/locale';
+import {space} from 'sentry/styles/space';
 import {Organization} from 'sentry/types';
 import {trackAnalytics} from 'sentry/utils/analytics';
 import withOrganizations from 'sentry/utils/withOrganizations';
@@ -136,20 +141,8 @@ class NotificationSettings extends DeprecatedAsyncComponent<Props, State> {
     for (const notificationType of this.notificationSettingsType) {
       const field = Object.assign({}, NOTIFICATION_SETTING_FIELDS[notificationType], {
         getData: data => this.getStateToPutForDefault(data, notificationType),
-        help: (
-          <Fragment>
-            <p>
-              {NOTIFICATION_SETTING_FIELDS[notificationType].help}
-              &nbsp;
-              <Link
-                data-test-id="fine-tuning"
-                to={`/settings/account/notifications/${NOTIFICATION_SETTINGS_PATHNAMES[notificationType]}`}
-              >
-                Fine tune
-              </Link>
-            </p>
-          </Fragment>
-        ),
+        help: NOTIFICATION_SETTING_FIELDS[notificationType].help,
+        type: notificationType,
       }) as any;
 
       if (
@@ -173,6 +166,7 @@ class NotificationSettings extends DeprecatedAsyncComponent<Props, State> {
 
     const allFields = [...fields, ...endOfFields];
 
+    console.log(allFields);
     return allFields;
   }
 
@@ -192,15 +186,22 @@ class NotificationSettings extends DeprecatedAsyncComponent<Props, State> {
         <TextBlock>
           {t('Personal notifications sent by email or an integration.')}
         </TextBlock>
-        <Form
-          model={this.model}
-          saveOnBlur
-          apiMethod="PUT"
-          onFieldChange={this.onFieldChange}
-          initialData={this.getInitialData()}
-        >
-          <JsonForm title={t('Notifications')} fields={this.getFields()} />
-        </Form>
+        <Panel>
+          {this.getFields().map(field => (
+            <StyledPanelItem
+              key={field.name}
+              to={`/settings/account/notifications/${
+                NOTIFICATION_SETTINGS_PATHNAMES[(field as any).notificationType]
+              }`}
+            >
+              <div>
+                <div>{(field as any).label}</div>
+                <Description>{(field as any).help}</Description>
+              </div>
+              <IconChevron direction="right" color="subText" />
+            </StyledPanelItem>
+          ))}
+        </Panel>
         <AlertLink to="/settings/account/emails" icon={<IconMail />}>
           {t('Looking to add or remove an email address? Use the emails panel.')}
         </AlertLink>
@@ -210,3 +211,25 @@ class NotificationSettings extends DeprecatedAsyncComponent<Props, State> {
 }
 
 export default withOrganizations(NotificationSettings);
+
+const StyledPanelItem = styled(Link)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid ${p => p.theme.innerBorder};
+  padding: ${space(2)};
+  color: ${p => p.theme.textColor};
+
+  &:hover {
+    color: ${p => p.theme.textColor};
+    background-color: ${p => p.theme.backgroundSecondary};
+  }
+
+  &:last-child {
+    border: 0;
+  }
+`;
+
+const Description = styled('div')`
+  color: ${p => p.theme.subText};
+`;
