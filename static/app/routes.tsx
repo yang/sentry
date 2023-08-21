@@ -698,6 +698,11 @@ function buildRoutes() {
         name={t('Auth Providers')}
         component={make(() => import('sentry/views/settings/organizationAuth'))}
       />
+      <Route
+        path="cleanup/"
+        name={t('Cleanup')}
+        component={make(() => import('sentry/views/settings/cleanup/index'))}
+      />
       <Redirect from="members/requests" to="members/" />
       <Route path="members/" name={t('Members')}>
         <Route

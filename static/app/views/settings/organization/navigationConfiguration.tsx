@@ -90,6 +90,12 @@ const organizationNavigation: NavigationSection[] = [
         id: 'integrations',
         recordAnalytics: true,
       },
+      {
+        path: `${pathPrefix}/cleanup/`,
+        title: t('Cleanup'),
+        description: t('Delete unused projects, teams and users in your organization.'),
+        id: 'cleanup',
+      },
     ],
   },
   {
