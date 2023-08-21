@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from sentry.api.bases.organization import OrganizationEndpoint
-from sentry.models.project import Project
-from sentry.models.team import Team
-from sentry.models.user import User
+from sentry.api.serializers.base import serialize
+from sentry.models import Group, Project, Team, User
 
-AGE_90_DAYS = datetime.now() - timedelta(days=90)
+AGE_90_DAYS = timezone.now() - timedelta(days=90)
 
 
 class OrganizationCleanupEndpoint(OrganizationEndpoint):
@@ -40,9 +40,14 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
                 status=status.HTTP_400_BAD_REQUEST, data={"details": "Invalid category"}
             )
 
-        return Response(status=status.HTTP_200_OK, data={"details": "Not implemented"})
+        if category == "projects":
+            projects = self.get_projects(request, organization)
+            projects_to_delete = self.get_projects_to_delete(projects)
+            return Response(serialize({"projects": projects_to_delete}, request.user))
 
-    def get_users_to_delete(self, users: list[User]) -> list[User]:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
+
+    def get_users_to_delete(self, organization_id: int) -> list[User]:
         """
         Returns a list of users that can be cleaned up.
 
@@ -51,7 +56,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         """
         return []
 
-    def get_teams_to_delete(self, teams: list[Team]) -> list[Team]:
+    def get_teams_to_delete(self, organization_id: int) -> list[Team]:
         """
         Returns a list of teams that can be cleaned up.
 
@@ -69,4 +74,19 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             - have never received an event
             - have no events in the past 90 days
         """
-        return []
+        result = [
+            project
+            for project in projects
+            if project.date_added < AGE_90_DAYS and not project.first_event
+        ]
+        project_ids = {project.id for project in projects}
+
+        projects_with_groups = (
+            Group.objects.filter(project__in=projects, last_seen__gt=AGE_90_DAYS)
+            .values_list("project_id", flat=True)
+            .distinct()
+        )
+        projects_without_events = project_ids - set(projects_with_groups)
+        result.extend([project for project in projects if project.id in projects_without_events])
+
+        return result
