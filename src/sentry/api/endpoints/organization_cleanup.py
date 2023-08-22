@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from sentry.api.bases.organization import OrganizationEndpoint
 from sentry.api.serializers.base import serialize
 from sentry.api.serializers.models.project import ProjectSerializer
-from sentry.models import Group, Project, Team, User
+from sentry.models import Group, Project, ProjectTeam, Team, TeamStatus, User
 
 AGE_90_DAYS = timezone.now() - timedelta(days=90)
 
@@ -46,7 +46,11 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             serialized_projects = serialize(projects_to_delete, request.user, ProjectSerializer())
             return Response(serialize({"projects": serialized_projects}, request.user))
 
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Not implemented"})
+        if category == "teams":
+            teams_to_delete = self.get_teams_to_delete(organization.id)
+            return Response(serialize({"teams": teams_to_delete}, request.user))
+
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
 
     def get_users_to_delete(self, organization_id: int) -> list[User]:
         """
@@ -65,7 +69,17 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             - have no projects
             - have no members
         """
-        return []
+        teams = Team.objects.filter(organization_id=organization_id, status=TeamStatus.ACTIVE)
+        team_ids = {team.id for team in teams}
+        result = [team for team in teams if not team.member_set.exists()]
+
+        project_teams = set(
+            ProjectTeam.objects.filter(team__in=teams).values_list("team_id", flat=True)
+        ).distinct()
+        teams_without_projects = team_ids - project_teams
+        result.extend(Team.objects.filter(id__in=teams_without_projects))
+
+        return result
 
     def get_projects_to_delete(self, projects: list[Project]) -> list[Project]:
         """
