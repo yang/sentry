@@ -41,7 +41,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         age_90_days = timezone.now() - timedelta(days=90)
 
         if category == "projects":
-            projects = self.get_projects(request, organization)
+            projects = self.get_projects(request, organization, include_all_accessible=True)
             projects_to_delete = self.get_projects_to_delete(projects, age_90_days)
 
             serialized_projects = serialize(projects_to_delete, request.user, ProjectSerializer())
