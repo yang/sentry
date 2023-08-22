@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.test.utils import override_settings
 
+from sentry.api.base import DEFAULT_SLUG_ERROR_MESSAGE
 from sentry.constants import ObjectStatus
 from sentry.models import Rule, RuleSource
 from sentry.monitors.models import Monitor, MonitorStatus, MonitorType, ScheduleType
@@ -222,10 +223,7 @@ class CreateOrganizationMonitorTest(MonitorTestCase):
         }
         response = self.get_error_response(self.organization.slug, **data, status_code=400)
 
-        assert response.data["slug"][0] == (
-            "Enter a valid slug consisting of lowercase letters, numbers, underscores or "
-            "hyphens. It cannot be entirely numeric."
-        )
+        assert response.data["slug"][0] == DEFAULT_SLUG_ERROR_MESSAGE
 
     @with_feature("app:enterprise-prevent-numeric-slugs")
     def test_generated_slug_not_entirely_numeric(self):
