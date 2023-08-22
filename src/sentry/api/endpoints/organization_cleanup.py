@@ -32,20 +32,18 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         category = request.GET.get("category")
         if not category:
             return Response(
-                status=status.HTTP_400_BAD_REQUEST, data={"details": "Category is required"}
+                status=status.HTTP_400_BAD_REQUEST, data={"detail": "Category is required"}
             )
 
         if category not in ("projects", "teams", "users"):
-            return Response(
-                status=status.HTTP_400_BAD_REQUEST, data={"details": "Invalid category"}
-            )
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Invalid category"})
 
         if category == "projects":
             projects = self.get_projects(request, organization)
             projects_to_delete = self.get_projects_to_delete(projects)
             return Response(serialize({"projects": projects_to_delete}, request.user))
 
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Not implemented"})
 
     def get_users_to_delete(self, organization_id: int) -> list[User]:
         """
