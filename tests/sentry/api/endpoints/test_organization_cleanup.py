@@ -26,9 +26,9 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert response.data["teams"] == []
 
     def test_projects_without_first_event(self):
-        project = self.create_project(organization=self.organization, first_event=None)
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(
+            organization=self.organization, first_event=None, date_added=DAYS_AGO_91
+        )
 
         response = self.get_success_response(self.organization.slug, category="projects")
         projects = response.data["projects"]
@@ -37,9 +37,9 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert projects[0]["firstEvent"] is None
 
     def test_projects_without_events_in_90_days(self):
-        project = self.create_project(organization=self.organization, first_event=datetime.now())
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(
+            organization=self.organization, first_event=datetime.now(), date_added=DAYS_AGO_91
+        )
 
         assert Group.objects.filter(project=project).count() == 0
 
@@ -49,9 +49,7 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert projects[0]["id"] == str(project.id)
 
     def test_skips_projects_with_events(self):
-        project = self.create_project(organization=self.organization)
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(organization=self.organization, date_added=DAYS_AGO_91)
 
         self.store_event(data={}, project_id=project.id)
         assert Group.objects.filter(project=project).count() == 1
@@ -61,14 +59,14 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
 
     def test_multiple_projects(self):
         # Project with no first event
-        project_1 = self.create_project(organization=self.organization, first_event=None)
-        project_1.date_added = DAYS_AGO_91
-        project_1.save()
+        project_1 = self.create_project(
+            organization=self.organization, first_event=None, date_added=DAYS_AGO_91
+        )
 
         # Project with no events in 90 days
-        project_2 = self.create_project(organization=self.organization, first_event=DAYS_AGO_91)
-        project_2.date_added = DAYS_AGO_91
-        project_2.save()
+        project_2 = self.create_project(
+            organization=self.organization, first_event=DAYS_AGO_91, date_added=DAYS_AGO_91
+        )
 
         assert Group.objects.filter(project=project_2).count() == 0
 
@@ -79,9 +77,7 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert projects[1]["id"] == str(project_2.id)
 
     def test_teams_with_no_projects(self):
-        team = self.create_team(organization=self.organization)
-        team.date_added = DAYS_AGO_91
-        team.save()
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
         self.create_team_membership(team=team, user=self.user)
 
         assert len(team.member_set) == 1
@@ -92,10 +88,8 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert teams[0]["id"] == str(team.id)
 
     def test_teams_with_no_members(self):
-        team = self.create_team(organization=self.organization)
-        team.date_added = DAYS_AGO_91
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
         assert len(team.member_set) == 0
-        team.save()
 
         response = self.get_success_response(self.organization.slug, category="teams")
         teams = response.data["teams"]
@@ -103,9 +97,7 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert teams[0]["id"] == str(team.id)
 
     def test_skips_teams_with_members_and_projects(self):
-        team = self.create_team(organization=self.organization)
-        team.date_added = DAYS_AGO_91
-        team.save()
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
         self.create_team_membership(team=team, user=self.user)
         self.project.add_team(team)
 
@@ -115,14 +107,10 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert response.data["teams"] == []
 
     def test_multiple_teams(self):
-        team_1 = self.create_team(organization=self.organization)
-        team_1.date_added = DAYS_AGO_91
-        team_1.save()
+        team_1 = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
         self.project.add_team(team_1)
 
-        team_2 = self.create_team(organization=self.organization)
-        team_2.date_added = DAYS_AGO_91
-        team_2.save()
+        team_2 = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
         self.create_team_membership(team=team_2, user=self.user)
 
         response = self.get_success_response(self.organization.slug, category="teams")
