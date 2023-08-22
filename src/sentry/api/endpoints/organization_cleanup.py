@@ -11,7 +11,7 @@ from sentry.api.bases.organization import OrganizationEndpoint
 from sentry.api.serializers.base import serialize
 from sentry.api.serializers.models.organization_member import OrganizationMemberSerializer
 from sentry.api.serializers.models.project import ProjectSerializer
-from sentry.api.serializers.models.team import TeamSerializer
+from sentry.api.serializers.models.team import TeamWithProjectsSerializer
 from sentry.models import Group, Organization, Project, ProjectTeam, Team, TeamStatus, User
 
 
@@ -50,7 +50,9 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         if category == "teams":
             teams_to_delete = self.get_teams_to_delete(organization.id, age_90_days)
 
-            serialized_teams = serialize(teams_to_delete, request.user, TeamSerializer())
+            serialized_teams = serialize(
+                teams_to_delete, request.user, TeamWithProjectsSerializer()
+            )
             return Response(serialize({"teams": serialized_teams}, request.user))
 
         if category == "members":

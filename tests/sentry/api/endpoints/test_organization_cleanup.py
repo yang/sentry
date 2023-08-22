@@ -23,6 +23,9 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         response = self.get_success_response(self.organization.slug, category="teams")
         assert response.data["teams"] == []
 
+        response = self.get_success_response(self.organization.slug, category="members")
+        assert response.data["members"] == []
+
     def test_projects_without_first_event(self):
         project = self.create_project(
             organization=self.organization, first_event=None, date_added=DAYS_AGO_91
@@ -84,6 +87,7 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         teams = response.data["teams"]
         assert len(teams) == 1
         assert teams[0]["id"] == str(team.id)
+        assert teams[0]["projects"] == []
 
     def test_teams_with_no_members(self):
         team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
