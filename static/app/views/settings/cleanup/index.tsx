@@ -20,7 +20,7 @@ import {TabList} from 'sentry/components/tabs';
 import TimeSince from 'sentry/components/timeSince';
 import {t, tn} from 'sentry/locale';
 import {space} from 'sentry/styles/space';
-import type {Member, Project, Team, User} from 'sentry/types';
+import type {Member, Project, Team, TeamWithProjects} from 'sentry/types';
 import {handleXhrErrorResponse} from 'sentry/utils/handleXhrErrorResponse';
 import {useApiQuery} from 'sentry/utils/queryClient';
 import useApi from 'sentry/utils/useApi';
@@ -40,7 +40,7 @@ const cleanupCategoryDescriptions: Record<CleanupCategory, string> = {
 
 const categoryHeaders: Record<CleanupCategory, string[]> = {
   projects: [t('Project'), ''],
-  teams: [t('Team'), ''],
+  teams: [t('Team'), t('# of projects'), ''],
   members: [t('User'), t('Last Seen'), ''],
 };
 
@@ -50,17 +50,17 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
   const category: CleanupCategory = location.query.category ?? 'projects';
 
   const {
-    data = [],
+    data = {},
     isLoading,
     isError,
     refetch,
-  } = useApiQuery<Team[] | User[] | Project[]>(
+  } = useApiQuery<Record<CleanupCategory, TeamWithProjects[] | Member[] | Project[]>>(
     [`/organizations/${organization.slug}/cleanup/`, {query: {category}}],
     {
       staleTime: 0,
-      retry: false,
     }
   );
+  const dataArray: any[] = data[category] ?? [];
 
   async function handleRemoveProject(project: Project) {
     removePageFiltersStorage(organization.slug);
@@ -76,6 +76,8 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
     } catch (err) {
       addErrorMessage(t('Error removing %s', project.slug));
       handleXhrErrorResponse('Unable to remove project', err);
+    } finally {
+      refetch();
     }
   }
 
@@ -89,6 +91,8 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
     } catch (err) {
       addErrorMessage(t('Error removing %s', team.slug));
       handleXhrErrorResponse('Unable to remove project', err);
+    } finally {
+      refetch();
     }
   }
 
@@ -107,6 +111,8 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
       addSuccessMessage(t('Removed %s from %s', member.name, organization.slug));
     } catch {
       addErrorMessage(t('Error removing %s from %s', member.name, organization.slug));
+    } finally {
+      refetch();
     }
   }
 
@@ -142,12 +148,12 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
           <StyledPanelTable
             headers={categoryHeaders[category]}
             isLoading={isLoading}
-            isEmpty={data.length === 0}
+            isEmpty={dataArray.length === 0}
           >
             <PanelAlert style={{gridColumn: `1/${categoryHeaders[category].length + 1}`}}>
               {cleanupCategoryDescriptions[category]}
             </PanelAlert>
-            {data.map((object: any) => {
+            {dataArray.map((object: any) => {
               if (category === 'projects') {
                 const project = object as Project;
                 return (
@@ -178,7 +184,12 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                         }
                       >
                         <div>
-                          <Button size="sm">{t('Remove Project')}</Button>
+                          <Button
+                            disabled={!isProjectAdmin(project) || project.isInternal}
+                            size="sm"
+                          >
+                            {t('Remove Project')}
+                          </Button>
                         </div>
                       </Confirm>
                     </FlexCenterRight>
@@ -186,7 +197,7 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                 );
               }
               if (category === 'teams') {
-                const team = object as Team;
+                const team = object as TeamWithProjects;
                 return (
                   <Fragment key={team.id}>
                     <FlexCenter>
@@ -200,6 +211,11 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                           description={tn('%s Member', '%s Members', team.memberCount)}
                         />
                       </Link>
+                    </FlexCenter>
+                    <FlexCenter>
+                      {team.projects.length === 0
+                        ? t('No Projects')
+                        : tn('%s project', '%s projects', team.projects.length)}
                     </FlexCenter>
                     <FlexCenterRight>
                       <Confirm
@@ -227,7 +243,7 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                       <IdBadge user={member.user!} avatarSize={32} />
                     </FlexCenter>
                     <FlexCenter>
-                      <TimeSince date={member.user!.lastLogin} />
+                      <TimeSince date={member.user!.lastActive} />
                     </FlexCenter>
                     <FlexCenterRight>
                       {!canRemoveMember && (
