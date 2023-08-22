@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from sentry.api.bases.organization import OrganizationEndpoint
 from sentry.api.serializers.base import serialize
+from sentry.api.serializers.models.project import ProjectSerializer
 from sentry.models import Group, Project, Team, User
 
 AGE_90_DAYS = timezone.now() - timedelta(days=90)
@@ -41,7 +42,9 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         if category == "projects":
             projects = self.get_projects(request, organization)
             projects_to_delete = self.get_projects_to_delete(projects)
-            return Response(serialize({"projects": projects_to_delete}, request.user))
+
+            serialized_projects = serialize(projects_to_delete, request.user, ProjectSerializer())
+            return Response(serialize({"projects": serialized_projects}, request.user))
 
         return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Not implemented"})
 
@@ -72,11 +75,11 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             - have never received an event
             - have no events in the past 90 days
         """
-        result = [
-            project
+        project_ids_to_delete = {
+            project.id
             for project in projects
             if project.date_added < AGE_90_DAYS and not project.first_event
-        ]
+        }
         project_ids = {project.id for project in projects}
 
         projects_with_groups = (
@@ -84,7 +87,5 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             .values_list("project_id", flat=True)
             .distinct()
         )
-        projects_without_events = project_ids - set(projects_with_groups)
-        result.extend([project for project in projects if project.id in projects_without_events])
-
-        return result
+        project_ids_to_delete.update(project_ids - set(projects_with_groups))
+        return [project for project in projects if project.id in project_ids_to_delete]
