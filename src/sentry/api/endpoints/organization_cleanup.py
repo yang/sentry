@@ -41,8 +41,8 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         age_90_days = timezone.now() - timedelta(days=90)
 
         if category == "projects":
-            projects = self.get_projects(request, organization, age_90_days)
-            projects_to_delete = self.get_projects_to_delete(projects)
+            projects = self.get_projects(request, organization)
+            projects_to_delete = self.get_projects_to_delete(projects, age_90_days)
 
             serialized_projects = serialize(projects_to_delete, request.user, ProjectSerializer())
             return Response(serialize({"projects": serialized_projects}, request.user))
@@ -107,17 +107,20 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             - have never received an event
             - have no events in the past 90 days
         """
-        project_ids_to_delete = {
+        deletable_project_ids = {
             project.id
             for project in projects
             if project.date_added < age_90_days and not project.is_internal_project()
         }
-        project_ids = {project.id for project in projects}
 
         projects_with_groups = (
-            Group.objects.filter(project__in=projects, last_seen__gt=age_90_days)
+            Group.objects.filter(project_id__in=deletable_project_ids, last_seen__gt=age_90_days)
             .values_list("project_id", flat=True)
             .distinct()
         )
-        project_ids_to_delete.update(project_ids - set(projects_with_groups))
-        return [project for project in projects if project.id in project_ids_to_delete]
+
+        return [
+            project
+            for project in projects
+            if project.id in (deletable_project_ids - set(projects_with_groups))
+        ]
