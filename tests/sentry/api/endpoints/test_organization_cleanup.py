@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 
 from sentry.models import Group
 from sentry.testutils.cases import APITestCase
-from sentry.testutils.silo import region_silo_test
 
 DAYS_AGO_91 = datetime.now() - timedelta(days=91)
 
@@ -15,7 +14,6 @@ class OrganizationCleanupTestBase(APITestCase):
         self.login_as(self.user)
 
 
-@region_silo_test(stable=True)
 class OrganizationCleanupTest(OrganizationCleanupTestBase):
     def test_simple(self):
         # Newly created projects, teams, and users are not considered for deletion
@@ -118,6 +116,23 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert len(teams) == 2
         assert teams[0]["id"] == str(team_1.id)
         assert teams[1]["id"] == str(team_2.id)
+
+    def test_users_with_no_activity(self):
+        user = self.create_user(last_active=DAYS_AGO_91)
+        user.password = "test"
+        user.save()
+
+        team = self.create_team(organization=self.organization)
+        self.create_team_membership(team=team, user=user)
+
+        response = self.get_success_response(self.organization.slug, category="users")
+        users = response.data["users"]
+        assert len(users) == 1
+        assert users[0]["id"] == str(user.id)
+
+    def test_skips_users_with_activity(self):
+        response = self.get_success_response(self.organization.slug, category="users")
+        assert response.data["users"] == []
 
     def test_invalid_category(self):
         response = self.get_error_response(self.organization.slug, category="invalid")
