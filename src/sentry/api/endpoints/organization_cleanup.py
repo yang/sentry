@@ -21,13 +21,13 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         Retrieve stale objects for an Organization
         ````````````````````````
 
-        Return the projects, teams, or users in an individual organization that can be cleaned up.
+        Return the projects, teams, or members in an individual organization that can be cleaned up.
 
         :pparam string organization_slug: the slug of the organization the
                                           team should be created for.
 
         :qparam category: the category of objects to cleanup.  Valid values
-                            are 'projects', 'teams', and 'users'.
+                            are 'projects', 'teams', and 'members'.
         :auth: required
         """
         category = request.GET.get("category")
@@ -36,7 +36,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
                 status=status.HTTP_400_BAD_REQUEST, data={"detail": "Category is required"}
             )
 
-        if category not in ("projects", "teams", "users"):
+        if category not in ("projects", "teams", "members"):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Invalid category"})
         age_90_days = timezone.now() - timedelta(days=90)
 
@@ -53,14 +53,13 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             serialized_teams = serialize(teams_to_delete, request.user, TeamSerializer())
             return Response(serialize({"teams": serialized_teams}, request.user))
 
-        if category == "users":
-            # We return the members here instead of the users because the remove method exists on OrganizationMember
+        if category == "members":
             members_to_delete = self.get_members_to_delete(organization, age_90_days)
 
             serialized_members = serialize(
                 members_to_delete, request.user, OrganizationMemberSerializer()
             )
-            return Response(serialize({"users": serialized_members}, request.user))
+            return Response(serialize({"members": serialized_members}, request.user))
 
         return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
 
