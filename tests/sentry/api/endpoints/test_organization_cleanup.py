@@ -91,12 +91,14 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
 
     def test_teams_with_no_members(self):
         team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        self.project.add_team(team)
         assert len(team.member_set) == 0
 
         response = self.get_success_response(self.organization.slug, category="teams")
         teams = response.data["teams"]
         assert len(teams) == 1
         assert teams[0]["id"] == str(team.id)
+        assert len(teams[0]["projects"]) == 1
 
     def test_skips_teams_with_members_and_projects(self):
         team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
