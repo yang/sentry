@@ -115,7 +115,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         project_ids = {project.id for project in projects}
 
         projects_with_groups = (
-            Group.objects.filter(project__in=projects, last_seen__lt=age_90_days)
+            Group.objects.filter(project__in=projects, last_seen__gt=age_90_days)
             .values_list("project_id", flat=True)
             .distinct()
         )
