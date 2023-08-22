@@ -119,20 +119,29 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
 
     def test_users_with_no_activity(self):
         user = self.create_user(last_active=DAYS_AGO_91)
-        user.password = "test"
-        user.save()
-
-        team = self.create_team(organization=self.organization)
-        self.create_team_membership(team=team, user=user)
+        member = self.create_member(organization=self.organization, user=user)
 
         response = self.get_success_response(self.organization.slug, category="users")
-        users = response.data["users"]
-        assert len(users) == 1
-        assert users[0]["id"] == str(user.id)
+        members = response.data["users"]
+        assert len(members) == 1
+        assert members[0]["id"] == str(member.id)
 
     def test_skips_users_with_activity(self):
         response = self.get_success_response(self.organization.slug, category="users")
         assert response.data["users"] == []
+
+    def test_multiple_users(self):
+        user_1 = self.create_user(last_active=DAYS_AGO_91)
+        member_1 = self.create_member(organization=self.organization, user=user_1)
+
+        user_2 = self.create_user(last_active=DAYS_AGO_91)
+        member_2 = self.create_member(organization=self.organization, user=user_2)
+
+        response = self.get_success_response(self.organization.slug, category="users")
+        members = response.data["users"]
+        assert len(members) == 2
+        assert members[0]["id"] == str(member_1.id)
+        assert members[1]["id"] == str(member_2.id)
 
     def test_invalid_category(self):
         response = self.get_error_response(self.organization.slug, category="invalid")

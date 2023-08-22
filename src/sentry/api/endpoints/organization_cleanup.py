@@ -9,9 +9,9 @@ from rest_framework.response import Response
 
 from sentry.api.bases.organization import OrganizationEndpoint
 from sentry.api.serializers.base import serialize
+from sentry.api.serializers.models.organization_member import OrganizationMemberSerializer
 from sentry.api.serializers.models.project import ProjectSerializer
 from sentry.api.serializers.models.team import TeamSerializer
-from sentry.api.serializers.models.user import UserSerializer
 from sentry.models import Group, Organization, Project, ProjectTeam, Team, TeamStatus, User
 
 AGE_90_DAYS = timezone.now() - timedelta(days=90)
@@ -55,29 +55,28 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             return Response(serialize({"teams": serialized_teams}, request.user))
 
         if category == "users":
-            users_to_delete = self.get_users_to_delete(organization)
+            # We return the members here instead of the users because the remove method exists on OrganizationMember
+            members_to_delete = self.get_members_to_delete(organization)
 
-            serialized_users = serialize(users_to_delete, request.user, UserSerializer())
-            return Response(serialize({"users": serialized_users}, request.user))
+            serialized_members = serialize(
+                members_to_delete, request.user, OrganizationMemberSerializer()
+            )
+            return Response(serialize({"users": serialized_members}, request.user))
 
         return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
 
-    def get_users_to_delete(self, organization: Organization) -> list[User]:
+    def get_members_to_delete(self, organization: Organization) -> list[User]:
         """
-        Returns a list of users that can be cleaned up.
+        Returns a list of organization members that can be cleaned up.
 
-        Users can be cleaned up if they have not been active for 1 year.
+        Members can be cleaned up if the corresponding user hasn't been active for 1 year.
 
         """
         user_ids = organization.member_set.values_list("user_id", flat=True)
         users = User.objects.filter(id__in=user_ids)
 
-        users_to_delete = set()
-        for user in users:
-            if user.last_active < AGE_90_DAYS:
-                users_to_delete.add(user)
-
-        return list(users_to_delete)
+        user_ids_to_delete = {user.id for user in users if user.last_active < AGE_90_DAYS}
+        return list(organization.member_set.filter(user_id__in=user_ids_to_delete))
 
     def get_teams_to_delete(self, organization_id: int) -> list[Team]:
         """
