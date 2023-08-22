@@ -18,6 +18,7 @@ class OrganizationCleanupTestBase(APITestCase):
 @region_silo_test(stable=True)
 class OrganizationCleanupTest(OrganizationCleanupTestBase):
     def test_simple(self):
+        # Newly created projects, teams, and users are not considered for deletion
         response = self.get_success_response(self.organization.slug, category="projects")
         assert response.data["projects"] == []
 
@@ -76,6 +77,59 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert len(projects) == 2
         assert projects[0]["id"] == str(project_1.id)
         assert projects[1]["id"] == str(project_2.id)
+
+    def test_teams_with_no_projects(self):
+        team = self.create_team(organization=self.organization)
+        team.date_added = DAYS_AGO_91
+        team.save()
+        self.create_team_membership(team=team, user=self.user)
+
+        assert len(team.member_set) == 1
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 1
+        assert teams[0]["id"] == str(team.id)
+
+    def test_teams_with_no_members(self):
+        team = self.create_team(organization=self.organization)
+        team.date_added = DAYS_AGO_91
+        assert len(team.member_set) == 0
+        team.save()
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 1
+        assert teams[0]["id"] == str(team.id)
+
+    def test_skips_teams_with_members_and_projects(self):
+        team = self.create_team(organization=self.organization)
+        team.date_added = DAYS_AGO_91
+        team.save()
+        self.create_team_membership(team=team, user=self.user)
+        self.project.add_team(team)
+
+        assert len(team.member_set) == 1
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        assert response.data["teams"] == []
+
+    def test_multiple_teams(self):
+        team_1 = self.create_team(organization=self.organization)
+        team_1.date_added = DAYS_AGO_91
+        team_1.save()
+        self.project.add_team(team_1)
+
+        team_2 = self.create_team(organization=self.organization)
+        team_2.date_added = DAYS_AGO_91
+        team_2.save()
+        self.create_team_membership(team=team_2, user=self.user)
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 2
+        assert teams[0]["id"] == str(team_1.id)
+        assert teams[1]["id"] == str(team_2.id)
 
     def test_invalid_category(self):
         response = self.get_error_response(self.organization.slug, category="invalid")

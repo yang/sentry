@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from sentry.api.bases.organization import OrganizationEndpoint
 from sentry.api.serializers.base import serialize
 from sentry.api.serializers.models.project import ProjectSerializer
+from sentry.api.serializers.models.team import TeamSerializer
 from sentry.models import Group, Project, ProjectTeam, Team, TeamStatus, User
 
 AGE_90_DAYS = timezone.now() - timedelta(days=90)
@@ -48,7 +49,9 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
 
         if category == "teams":
             teams_to_delete = self.get_teams_to_delete(organization.id)
-            return Response(serialize({"teams": teams_to_delete}, request.user))
+
+            serialized_teams = serialize(teams_to_delete, request.user, TeamSerializer())
+            return Response(serialize({"teams": serialized_teams}, request.user))
 
         return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
 
@@ -65,21 +68,23 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         """
         Returns a list of teams that can be cleaned up.
 
-        Teams can be cleaned up if they are older than 90 days and
+        Teams can be cleaned up if they are older than 90 days and they either
             - have no projects
             - have no members
         """
-        teams = Team.objects.filter(organization_id=organization_id, status=TeamStatus.ACTIVE)
+        teams = Team.objects.filter(
+            organization_id=organization_id, status=TeamStatus.ACTIVE, date_added__lt=AGE_90_DAYS
+        )
         team_ids = {team.id for team in teams}
-        result = [team for team in teams if not team.member_set.exists()]
+        team_ids_to_delete = {team.id for team in teams if not team.member_set.exists()}
 
         project_teams = set(
-            ProjectTeam.objects.filter(team__in=teams).values_list("team_id", flat=True)
-        ).distinct()
+            ProjectTeam.objects.filter(team__in=teams).values_list("team_id", flat=True).distinct()
+        )
         teams_without_projects = team_ids - project_teams
-        result.extend(Team.objects.filter(id__in=teams_without_projects))
+        team_ids_to_delete.update(teams_without_projects)
 
-        return result
+        return list(teams.filter(id__in=team_ids_to_delete))
 
     def get_projects_to_delete(self, projects: list[Project]) -> list[Project]:
         """
