@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 
 from sentry.models import Group
 from sentry.testutils.cases import APITestCase
-from sentry.testutils.silo import region_silo_test
 
 DAYS_AGO_91 = datetime.now() - timedelta(days=91)
 
@@ -15,16 +14,19 @@ class OrganizationCleanupTestBase(APITestCase):
         self.login_as(self.user)
 
 
-@region_silo_test(stable=True)
 class OrganizationCleanupTest(OrganizationCleanupTestBase):
     def test_simple(self):
+        # Newly created projects, teams, and users are not considered for deletion
         response = self.get_success_response(self.organization.slug, category="projects")
         assert response.data["projects"] == []
 
+        response = self.get_success_response(self.organization.slug, category="teams")
+        assert response.data["teams"] == []
+
     def test_projects_without_first_event(self):
-        project = self.create_project(organization=self.organization, first_event=None)
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(
+            organization=self.organization, first_event=None, date_added=DAYS_AGO_91
+        )
 
         response = self.get_success_response(self.organization.slug, category="projects")
         projects = response.data["projects"]
@@ -33,9 +35,9 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert projects[0]["firstEvent"] is None
 
     def test_projects_without_events_in_90_days(self):
-        project = self.create_project(organization=self.organization, first_event=datetime.now())
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(
+            organization=self.organization, first_event=datetime.now(), date_added=DAYS_AGO_91
+        )
 
         assert Group.objects.filter(project=project).count() == 0
 
@@ -45,9 +47,7 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert projects[0]["id"] == str(project.id)
 
     def test_skips_projects_with_events(self):
-        project = self.create_project(organization=self.organization)
-        project.date_added = DAYS_AGO_91
-        project.save()
+        project = self.create_project(organization=self.organization, date_added=DAYS_AGO_91)
 
         self.store_event(data={}, project_id=project.id)
         assert Group.objects.filter(project=project).count() == 1
@@ -57,14 +57,14 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
 
     def test_multiple_projects(self):
         # Project with no first event
-        project_1 = self.create_project(organization=self.organization, first_event=None)
-        project_1.date_added = DAYS_AGO_91
-        project_1.save()
+        project_1 = self.create_project(
+            organization=self.organization, first_event=None, date_added=DAYS_AGO_91
+        )
 
         # Project with no events in 90 days
-        project_2 = self.create_project(organization=self.organization, first_event=DAYS_AGO_91)
-        project_2.date_added = DAYS_AGO_91
-        project_2.save()
+        project_2 = self.create_project(
+            organization=self.organization, first_event=DAYS_AGO_91, date_added=DAYS_AGO_91
+        )
 
         assert Group.objects.filter(project=project_2).count() == 0
 
@@ -73,6 +73,66 @@ class OrganizationCleanupTest(OrganizationCleanupTestBase):
         assert len(projects) == 2
         assert projects[0]["id"] == str(project_1.id)
         assert projects[1]["id"] == str(project_2.id)
+
+    def test_teams_with_no_projects(self):
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        self.create_team_membership(team=team, user=self.user)
+
+        assert len(team.member_set) == 1
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 1
+        assert teams[0]["id"] == str(team.id)
+
+    def test_teams_with_no_members(self):
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        assert len(team.member_set) == 0
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 1
+        assert teams[0]["id"] == str(team.id)
+
+    def test_skips_teams_with_members_and_projects(self):
+        team = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        self.create_team_membership(team=team, user=self.user)
+        self.project.add_team(team)
+
+        assert len(team.member_set) == 1
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        assert response.data["teams"] == []
+
+    def test_multiple_teams(self):
+        team_1 = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        self.project.add_team(team_1)
+
+        team_2 = self.create_team(organization=self.organization, date_added=DAYS_AGO_91)
+        self.create_team_membership(team=team_2, user=self.user)
+
+        response = self.get_success_response(self.organization.slug, category="teams")
+        teams = response.data["teams"]
+        assert len(teams) == 2
+        assert teams[0]["id"] == str(team_1.id)
+        assert teams[1]["id"] == str(team_2.id)
+
+    def test_users_with_no_activity(self):
+        user = self.create_user(last_active=DAYS_AGO_91)
+        user.password = "test"
+        user.save()
+
+        team = self.create_team(organization=self.organization)
+        self.create_team_membership(team=team, user=user)
+
+        response = self.get_success_response(self.organization.slug, category="users")
+        users = response.data["users"]
+        assert len(users) == 1
+        assert users[0]["id"] == str(user.id)
+
+    def test_skips_users_with_activity(self):
+        response = self.get_success_response(self.organization.slug, category="users")
+        assert response.data["users"] == []
 
     def test_invalid_category(self):
         response = self.get_error_response(self.organization.slug, category="invalid")
