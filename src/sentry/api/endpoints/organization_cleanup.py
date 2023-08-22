@@ -14,8 +14,6 @@ from sentry.api.serializers.models.project import ProjectSerializer
 from sentry.api.serializers.models.team import TeamSerializer
 from sentry.models import Group, Organization, Project, ProjectTeam, Team, TeamStatus, User
 
-AGE_90_DAYS = timezone.now() - timedelta(days=90)
-
 
 class OrganizationCleanupEndpoint(OrganizationEndpoint):
     def get(self, request: Request, organization):
@@ -40,23 +38,24 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
 
         if category not in ("projects", "teams", "users"):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"detail": "Invalid category"})
+        age_90_days = timezone.now() - timedelta(days=90)
 
         if category == "projects":
-            projects = self.get_projects(request, organization)
+            projects = self.get_projects(request, organization, age_90_days)
             projects_to_delete = self.get_projects_to_delete(projects)
 
             serialized_projects = serialize(projects_to_delete, request.user, ProjectSerializer())
             return Response(serialize({"projects": serialized_projects}, request.user))
 
         if category == "teams":
-            teams_to_delete = self.get_teams_to_delete(organization.id)
+            teams_to_delete = self.get_teams_to_delete(organization.id, age_90_days)
 
             serialized_teams = serialize(teams_to_delete, request.user, TeamSerializer())
             return Response(serialize({"teams": serialized_teams}, request.user))
 
         if category == "users":
             # We return the members here instead of the users because the remove method exists on OrganizationMember
-            members_to_delete = self.get_members_to_delete(organization)
+            members_to_delete = self.get_members_to_delete(organization, age_90_days)
 
             serialized_members = serialize(
                 members_to_delete, request.user, OrganizationMemberSerializer()
@@ -65,7 +64,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
 
         return Response(status=status.HTTP_400_BAD_REQUEST, data={"details": "Not implemented"})
 
-    def get_members_to_delete(self, organization: Organization) -> list[User]:
+    def get_members_to_delete(self, organization: Organization, age_90_days) -> list[User]:
         """
         Returns a list of organization members that can be cleaned up.
 
@@ -75,10 +74,10 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         user_ids = organization.member_set.values_list("user_id", flat=True)
         users = User.objects.filter(id__in=user_ids)
 
-        user_ids_to_delete = {user.id for user in users if user.last_active < AGE_90_DAYS}
+        user_ids_to_delete = {user.id for user in users if user.last_active < age_90_days}
         return list(organization.member_set.filter(user_id__in=user_ids_to_delete))
 
-    def get_teams_to_delete(self, organization_id: int) -> list[Team]:
+    def get_teams_to_delete(self, organization_id: int, age_90_days) -> list[Team]:
         """
         Returns a list of teams that can be cleaned up.
 
@@ -87,7 +86,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
             - have no members
         """
         teams = Team.objects.filter(
-            organization_id=organization_id, status=TeamStatus.ACTIVE, date_added__lt=AGE_90_DAYS
+            organization_id=organization_id, status=TeamStatus.ACTIVE, date_added__lt=age_90_days
         )
         team_ids = {team.id for team in teams}
         team_ids_to_delete = {team.id for team in teams if not team.member_set.exists()}
@@ -100,7 +99,7 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
 
         return list(teams.filter(id__in=team_ids_to_delete))
 
-    def get_projects_to_delete(self, projects: list[Project]) -> list[Project]:
+    def get_projects_to_delete(self, projects: list[Project], age_90_days) -> list[Project]:
         """
         Returns a list of projects that can be cleaned up.
 
@@ -111,12 +110,12 @@ class OrganizationCleanupEndpoint(OrganizationEndpoint):
         project_ids_to_delete = {
             project.id
             for project in projects
-            if project.date_added < AGE_90_DAYS and not project.first_event
+            if project.date_added < age_90_days and not project.is_internal_project()
         }
         project_ids = {project.id for project in projects}
 
         projects_with_groups = (
-            Group.objects.filter(project__in=projects, last_seen__gt=AGE_90_DAYS)
+            Group.objects.filter(project__in=projects, last_seen__lt=age_90_days)
             .values_list("project_id", flat=True)
             .distinct()
         )
