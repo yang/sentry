@@ -16,7 +16,7 @@ import LoadingError from 'sentry/components/loadingError';
 import {removePageFiltersStorage} from 'sentry/components/organizations/pageFilters/persistence';
 import PanelAlert from 'sentry/components/panels/panelAlert';
 import PanelTable from 'sentry/components/panels/panelTable';
-import {TabList} from 'sentry/components/tabs';
+import {TabList, Tabs} from 'sentry/components/tabs';
 import TimeSince from 'sentry/components/timeSince';
 import {t, tn} from 'sentry/locale';
 import {space} from 'sentry/styles/space';
@@ -128,19 +128,24 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
       </p>
 
       <Layout>
-        <TabList>
-          {cleanupCategories.map(cat => (
-            <TabList.Item
-              key={cat}
-              to={{
-                pathname: location.pathname,
-                query: {category: cat},
-              }}
-            >
-              {capitalize(cat)}
-            </TabList.Item>
-          ))}
-        </TabList>
+        <Tabs defaultValue={cleanupCategories[0]} value={category}>
+          <TabList>
+            {cleanupCategories.map(cat => (
+              <TabList.Item
+                key={cat}
+                to={{
+                  ...location,
+                  query: {
+                    ...location.query,
+                    category: cat,
+                  },
+                }}
+              >
+                {capitalize(cat)}
+              </TabList.Item>
+            ))}
+          </TabList>
+        </Tabs>
 
         {isError ? (
           <LoadingError onRetry={refetch} />
