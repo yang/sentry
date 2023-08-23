@@ -245,7 +245,7 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                 return (
                   <Fragment key={member.id}>
                     <FlexCenter>
-                      <IdBadge user={member.user!} avatarSize={32} />
+                      <IdBadge member={member} avatarSize={32} />
                     </FlexCenter>
                     <FlexCenter>
                       <TimeSince date={member.user!.lastActive} />
