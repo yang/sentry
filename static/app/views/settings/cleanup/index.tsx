@@ -1,4 +1,4 @@
-import {Fragment} from 'react';
+import {Fragment, useCallback, useState} from 'react';
 import type {RouteComponentProps} from 'react-router';
 import styled from '@emotion/styled';
 import capitalize from 'lodash/capitalize';
@@ -31,27 +31,29 @@ import TextBlock from 'sentry/views/settings/components/text/textBlock';
 interface OrganizationCleanupProps extends RouteComponentProps<{orgId: string}, {}> {}
 
 type CleanupCategory = 'projects' | 'teams' | 'members';
-const cleanupCategories: CleanupCategory[] = ['projects', 'teams', 'members'];
+const cleanupCategories: CleanupCategory[] = ['projects', 'members', 'teams'];
 const cleanupCategoryDescriptions: Record<CleanupCategory, string> = {
   projects: t('Projects that have not received any events in the last 90 days.'),
-  teams: t('Teams that have no members or no projects.'),
   members: t('Members that have not been active in 1 year.'),
+  teams: t('Teams that have no members or no projects.'),
 };
 
 const categoryHeaders: Record<CleanupCategory, string[]> = {
   projects: [t('Project'), ''],
-  teams: [t('Team'), t('# of projects'), ''],
   members: [t('User'), t('Last Seen'), ''],
+  teams: [t('Team'), t('# of projects'), ''],
 };
 
 export default function OrganizationCleanup({location}: OrganizationCleanupProps) {
   const organization = useOrganization();
   const api = useApi();
   const category: CleanupCategory = location.query.category ?? 'projects';
+  const [busyItems, setBusyItems] = useState<string[]>([]);
 
   const {
     data = {},
     isLoading,
+    isFetching,
     isError,
     refetch,
   } = useApiQuery<Record<CleanupCategory, TeamWithProjects[] | Member[] | Project[]>>(
@@ -62,59 +64,74 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
   );
   const dataArray: any[] = data[category] ?? [];
 
-  async function handleRemoveProject(project: Project) {
-    removePageFiltersStorage(organization.slug);
+  const handleRemoveProject = useCallback(
+    async (project: Project) => {
+      removePageFiltersStorage(organization.slug);
+      setBusyItems(items => [...items, project.slug]);
 
-    try {
-      await removeProject({
-        api,
-        orgSlug: organization.slug,
-        projectSlug: project.slug,
-        origin: 'settings',
-      });
-      addSuccessMessage(t('%s was successfully removed', project.slug));
-    } catch (err) {
-      addErrorMessage(t('Error removing %s', project.slug));
-      handleXhrErrorResponse('Unable to remove project', err);
-    } finally {
-      refetch();
-    }
-  }
+      try {
+        await removeProject({
+          api,
+          orgSlug: organization.slug,
+          projectSlug: project.slug,
+          origin: 'settings',
+        });
+        addSuccessMessage(t('%s was successfully removed', project.slug));
+      } catch (err) {
+        addErrorMessage(t('Error removing %s', project.slug));
+        handleXhrErrorResponse('Unable to remove project', err);
+      } finally {
+        refetch();
+        setBusyItems(items => items.filter(item => item !== project.slug));
+      }
+    },
+    [refetch, organization.slug, api, setBusyItems]
+  );
 
   const isProjectAdmin = (project: Project) =>
     hasEveryAccess(['project:admin'], {organization, project});
 
-  async function handleRemoveTeam(team: Team) {
-    try {
-      await removeTeam(api, {orgId: organization.slug, teamId: team.slug});
-      addSuccessMessage(t('%s was successfully removed', team.slug));
-    } catch (err) {
-      addErrorMessage(t('Error removing %s', team.slug));
-      handleXhrErrorResponse('Unable to remove project', err);
-    } finally {
-      refetch();
-    }
-  }
+  const handleRemoveTeam = useCallback(
+    async (team: Team) => {
+      setBusyItems(items => [...items, team.slug]);
+      try {
+        await removeTeam(api, {orgId: organization.slug, teamId: team.slug});
+        addSuccessMessage(t('%s was successfully removed', team.slug));
+      } catch (err) {
+        addErrorMessage(t('Error removing %s', team.slug));
+        handleXhrErrorResponse('Unable to remove project', err);
+      } finally {
+        refetch();
+        setBusyItems(items => items.filter(item => item !== team.slug));
+      }
+    },
+    [organization.slug, api, refetch, setBusyItems]
+  );
 
   const hasTeamAdmin = (team: Team) =>
     hasEveryAccess(['team:admin'], {organization, team});
 
-  async function handleRemoveMember(member: Member) {
-    try {
-      await api.requestPromise(
-        `/organizations/${organization.slug}/members/${member.id}/`,
-        {
-          method: 'DELETE',
-          data: {},
-        }
-      );
-      addSuccessMessage(t('Removed %s from %s', member.name, organization.slug));
-    } catch {
-      addErrorMessage(t('Error removing %s from %s', member.name, organization.slug));
-    } finally {
-      refetch();
-    }
-  }
+  const handleRemoveMember = useCallback(
+    async (member: Member) => {
+      setBusyItems(items => [...items, member.id]);
+      try {
+        await api.requestPromise(
+          `/organizations/${organization.slug}/members/${member.id}/`,
+          {
+            method: 'DELETE',
+            data: {},
+          }
+        );
+        addSuccessMessage(t('Removed %s from %s', member.name, organization.slug));
+      } catch {
+        addErrorMessage(t('Error removing %s from %s', member.name, organization.slug));
+      } finally {
+        refetch();
+        setBusyItems(items => items.filter(item => item !== member.id));
+      }
+    },
+    [organization.slug, api, refetch, setBusyItems]
+  );
 
   const canRemoveMembers = organization.access.includes('member:admin');
 
@@ -152,10 +169,14 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
         ) : (
           <StyledPanelTable
             headers={categoryHeaders[category]}
-            isLoading={isLoading}
+            isLoading={isLoading || isFetching}
             isEmpty={dataArray.length === 0}
           >
-            <PanelAlert style={{gridColumn: `1/${categoryHeaders[category].length + 1}`}}>
+            <PanelAlert
+              style={{
+                gridColumn: `1/${categoryHeaders[category].length + 1}`,
+              }}
+            >
               {cleanupCategoryDescriptions[category]}
             </PanelAlert>
             {dataArray.map((object: any) => {
@@ -164,7 +185,7 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                 return (
                   <Fragment key={project.id}>
                     <FlexCenter>
-                      <ProjectBadge project={project} avatarSize={16} />
+                      <ProjectBadge project={project} avatarSize={24} />
                     </FlexCenter>
 
                     <FlexCenterRight>
@@ -191,6 +212,7 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                         <div>
                           <Button
                             disabled={!isProjectAdmin(project) || project.isInternal}
+                            busy={busyItems.includes(project.slug)}
                             size="sm"
                           >
                             {t('Remove Project')}
@@ -232,7 +254,9 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                           `#${team.slug}`
                         )}
                       >
-                        <Button size="sm">{t('Remove Team')}</Button>
+                        <Button size="sm" busy={busyItems.includes(team.slug)}>
+                          {t('Remove Team')}
+                        </Button>
                       </Confirm>
                     </FlexCenterRight>
                   </Fragment>
@@ -275,7 +299,9 @@ export default function OrganizationCleanup({location}: OrganizationCleanupProps
                           )}
                           onConfirm={() => handleRemoveMember(member)}
                         >
-                          <Button size="sm">{t('Remove')}</Button>
+                          <Button size="sm" busy={busyItems.includes(member.id)}>
+                            {t('Remove')}
+                          </Button>
                         </Confirm>
                       )}
                     </FlexCenterRight>
@@ -298,7 +324,9 @@ const Layout = styled('div')`
   gap: ${space(2)};
 `;
 
-const StyledPanelTable = styled(PanelTable)``;
+const StyledPanelTable = styled(PanelTable)`
+  margin-bottom: 0;
+`;
 
 const FlexCenter = styled('div')`
   ${p => p.theme.overflowEllipsis}
