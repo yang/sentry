@@ -5,7 +5,7 @@ import responses
 from django.test import RequestFactory
 
 from sentry.integrations.github_enterprise.integration import GitHubEnterpriseIntegration
-from sentry.models import ExternalIssue, Integration
+from sentry.models import ExternalIssue
 from sentry.testutils.cases import TestCase
 from sentry.testutils.silo import region_silo_test
 from sentry.utils import json
@@ -20,9 +20,10 @@ class GitHubEnterpriseIssueBasicTest(TestCase):
     def setUp(self):
         self.user = self.create_user()
         self.organization = self.create_organization(owner=self.user)
-        self.model = Integration.objects.create(
-            provider="github_enterprise",
+        self.model = self.create_integration(
+            organization=self.organization,
             external_id="github_external_id",
+            provider="github_enterprise",
             name="getsentry",
             metadata={
                 "domain_name": "35.232.149.196/getsentry",
@@ -30,7 +31,6 @@ class GitHubEnterpriseIssueBasicTest(TestCase):
                 "installation": {"id": 2, "private_key": "private_key", "verify_ssl": True},
             },
         )
-        self.model.add_organization(self.organization, self.user)
         self.integration = GitHubEnterpriseIntegration(self.model, self.organization.id)
 
     @responses.activate
